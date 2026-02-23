@@ -1,0 +1,76 @@
+/* static/css/dashboard.css */
+:root {
+    --bg-main: #0d1117;        /* Deep midnight background */
+    --bg-surface: #161b22;     /* Lighter surface for cards/tables */
+    --border-color: #30363d;
+    --text-primary: #c9d1d9;
+    --text-secondary: #8b949e;
+    --accent-blue: #58a6ff;
+    --accent-green: #238636;
+    --danger-red: #da3633;
+}
+
+body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, sans-serif;
+    margin: 0;
+    padding: 2rem;
+}
+
+h1, h2, h3 { color: #ffffff; }
+
+/* Dashboard Table Styling */
+.agent-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 1.5rem;
+}
+
+.agent-table th {
+    background: #21262d;
+    text-align: left;
+    padding: 12px 16px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.agent-table td {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Button & UI Components */
+.btn-primary {
+    background-color: var(--accent-green);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: bold;
+    display: inline-block;
+}
+
+.btn-download {
+    color: var(--accent-blue);
+    text-decoration: none;
+    font-size: 0.9rem;
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.btn-download:hover {
+    background: #30363d;
+}
+
+/* Status Indicators */
+.status-ready {
+    color: #3fb950;
+    font-size: 0.85rem;
+}

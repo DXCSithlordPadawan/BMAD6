@@ -1,0 +1,29 @@
+<div class="dashboard-container">
+    <h1>{{ config.icon }} {{ config.application_title }} Dashboard</h1>
+    <hr>
+    <h3>Available Agents</h3>
+    <table class="agent-table">
+        <thead>
+            <tr>
+                <th>Agent Name</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for agent in agents %}
+            <tr>
+                <td><strong>{{ agent }}</strong></td>
+                <td>✅ Ready</td>
+                <td>
+                    <a href="{% url 'download_zip' agent %}" class="btn-download">Download ZIP</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3">No agents generated yet. Start by creating a new one!</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <br>
+    <a href="{% url 'template_list' %}" class="btn-primary">+ Create New Agent</a>
+</div>

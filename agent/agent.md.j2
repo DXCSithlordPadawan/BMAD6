@@ -1,0 +1,14 @@
+# Agent: {{ agent_name }} {{ icon }}
+**System Title:** {{ application_title }}
+
+## Role & Context
+{% include "shards/step-00_role.md" %}
+
+## Operational Workflow
+{% include "shards/step-01_logic.md" %}
+
+## Output Constraints
+{% include "shards/step-02_format.md" %}
+
+---
+*Generated at port: {{ web_port }}*
