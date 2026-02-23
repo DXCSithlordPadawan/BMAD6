@@ -5,3 +5,5 @@ app_settings:
   base_location: "./bmad_output/"
   icon: "🧱"
   sharding_enabled: true
+  # HTTPS is controlled via environment variables (see .env.example):
+  #   HTTPS_ENABLED=1, SSL_CERT_FILE=<path>, SSL_KEY_FILE=<path>

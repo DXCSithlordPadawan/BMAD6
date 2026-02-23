@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Login — {{ config.application_title }}{% endblock %}
+{% block content %}
+<h1>{{ config.icon }} Sign In</h1>
+<p class="subtitle">Please sign in to access {{ config.application_title }}.</p>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="login-card">
+  <form method="post" action="{{ url_for('login', next=request.args.get('next', '')) }}" autocomplete="on">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+
+    <div class="form-group">
+      <label for="username">Username</label>
+      <input
+        type="text"
+        id="username"
+        name="username"
+        class="form-control"
+        required
+        autocomplete="username"
+        maxlength="100"
+      >
+    </div>
+
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input
+        type="password"
+        id="password"
+        name="password"
+        class="form-control"
+        required
+        autocomplete="current-password"
+      >
+    </div>
+
+    <button type="submit" class="btn-primary">🔐 Sign In</button>
+  </form>
+</div>
+{% endblock %}
