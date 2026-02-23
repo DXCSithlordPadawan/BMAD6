@@ -5,8 +5,12 @@ produce BMAD v6-compliant sharded Markdown files ready for AI submission.
 
 Security hardening applied per OWASP Top 10, NIST SP 800-53, CIS Level 2,
 and FIPS 140-2 (CSPRNG token generation, HMAC-based CSRF validation).
+
+Authentication via Flask-Login with role-based access control (RBAC).
+Supports HTTP and HTTPS operation via environment configuration.
 """
 
+import functools
 import hmac
 import io
 import json
@@ -22,6 +26,7 @@ from dotenv import load_dotenv
 from flask import (
     Flask,
     abort,
+    flash,
     redirect,
     render_template,
     request,
@@ -29,7 +34,16 @@ from flask import (
     session,
     url_for,
 )
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    current_user,
+    login_required,
+    login_user,
+    logout_user,
+)
 from markupsafe import escape
+from werkzeug.security import check_password_hash
 
 # ── Bootstrap ─────────────────────────────────────────────────────────────────
 load_dotenv()
@@ -56,6 +70,7 @@ if not _env_secret:
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = BASE_DIR / "config" / "config.yaml"
 LIBRARY_PATH = BASE_DIR / "config" / "bmad_library.json"
+USERS_PATH = BASE_DIR / "config" / "users.yaml"
 
 # ── Configuration Helpers ──────────────────────────────────────────────────────
 
@@ -90,6 +105,87 @@ def get_output_dir() -> Path:
         ) from exc
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+# ── Authentication — User Model and Login Manager ─────────────────────────────
+
+#: Valid application roles and which routes they may access.
+ROLE_PERMISSIONS: dict[str, set[str]] = {
+    "admin": {"index", "guide", "dashboard", "success", "download_zip", "amend_template"},
+    "user": {"index", "guide", "dashboard", "success", "download_zip", "amend_template"},
+    "security_lead": {"index", "dashboard"},
+    "devops": {"index"},
+}
+
+login_manager = LoginManager()
+login_manager.login_view = "login"  # type: ignore[assignment]
+login_manager.login_message = "Please log in to access this page."
+login_manager.login_message_category = "warning"
+login_manager.init_app(app)
+
+
+class User(UserMixin):
+    """In-memory user object loaded from config/users.yaml."""
+
+    def __init__(self, username: str, password_hash: str, role: str) -> None:
+        self.id = username  # Flask-Login uses .id for session storage
+        self.username = username
+        self.password_hash = password_hash
+        self.role = role
+
+
+def load_users() -> dict[str, User]:
+    """Load users from config/users.yaml, keyed by username."""
+    if not USERS_PATH.exists():
+        logger.warning("users.yaml not found at %s — no users available.", USERS_PATH)
+        return {}
+    with open(USERS_PATH, "r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh) or {}
+    users: dict[str, User] = {}
+    for entry in data.get("users", []):
+        uname = entry.get("username", "")
+        if uname:
+            users[uname] = User(
+                username=uname,
+                password_hash=entry.get("password_hash", ""),
+                role=entry.get("role", "user"),
+            )
+    return users
+
+
+@login_manager.user_loader
+def user_loader(user_id: str):
+    """Return a User object for the given user_id (username), or None."""
+    return load_users().get(user_id)
+
+
+def role_required(*roles: str):
+    """Decorator: redirect to login if unauthenticated, abort 403 if role not in *roles*.
+
+    Must be applied after ``@login_required`` in the decorator stack so that
+    Flask-Login's redirect logic runs first when the user is not authenticated.
+    The check at line 168 is a defence-in-depth fallback for direct use without
+    ``@login_required``.
+    """
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapped(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return login_manager.unauthorized()
+            if current_user.role not in roles:
+                logger.warning(
+                    "Access denied: user '%s' (role=%s) attempted to access '%s'",
+                    current_user.username,
+                    current_user.role,
+                    request.path,
+                )
+                abort(403)
+            return fn(*args, **kwargs)
+
+        return wrapped
+
+    return decorator
 
 
 # ── CSRF Protection ────────────────────────────────────────────────────────────
@@ -154,6 +250,48 @@ def apply_security_headers(response):
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    """Username/password login page."""
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+
+    config = load_config()
+    if request.method == "POST":
+        if not _validate_csrf(request.form.get("_csrf")):
+            logger.warning("CSRF validation failed on /login")
+            abort(403)
+
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        users = load_users()
+        user = users.get(username)
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
+            logger.info("User '%s' (role=%s) logged in.", username, user.role)
+            next_page = request.args.get("next")
+            # Guard against open-redirect: only allow relative next paths.
+            if next_page and next_page.startswith("/") and not next_page.startswith("//"):
+                return redirect(next_page)
+            return redirect(url_for("index"))
+
+        logger.warning("Failed login attempt for username '%s'.", username)
+        flash("Invalid username or password.", "danger")
+
+    return render_template("login.html", config=config)
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    """Log out the current user."""
+    username = current_user.username
+    logout_user()
+    logger.info("User '%s' logged out.", username)
+    return redirect(url_for("login"))
+
+
 @app.route("/")
 def index():
     """List all available BMAD templates (agents and documents)."""
@@ -163,6 +301,8 @@ def index():
 
 
 @app.route("/guide/<int:template_id>", methods=["GET", "POST"])
+@login_required
+@role_required("admin", "user")
 def guide(template_id: int):
     """Step-by-step guided interview to populate a BMAD v6 template."""
     config = load_config()
@@ -236,6 +376,8 @@ def guide(template_id: int):
 
 
 @app.route("/dashboard")
+@login_required
+@role_required("admin", "user", "security_lead")
 def dashboard():
     """Show all previously generated BMAD agents and documents."""
     config = load_config()
@@ -251,6 +393,8 @@ def dashboard():
 
 
 @app.route("/success/<agent_name>")
+@login_required
+@role_required("admin", "user")
 def success(agent_name: str):
     """Confirmation page displayed after successful generation."""
     safe_name = sanitise_name(agent_name)
@@ -268,6 +412,8 @@ def success(agent_name: str):
 
 
 @app.route("/download/<agent_name>")
+@login_required
+@role_required("admin", "user")
 def download_zip(agent_name: str):
     """Stream a ZIP archive of all sharded files for a given agent."""
     safe_name = sanitise_name(agent_name)
@@ -299,6 +445,8 @@ def download_zip(agent_name: str):
 
 
 @app.route("/amend/<int:template_id>", methods=["GET", "POST"])
+@login_required
+@role_required("admin", "user")
 def amend_template(template_id: int):
     """Update the default content for a template's sections."""
     config = load_config()
@@ -369,4 +517,34 @@ if __name__ == "__main__":
     _port = int(_config.get("web_port", 8000))
     # SECURITY: debug mode must never be enabled in production.
     _debug = os.environ.get("FLASK_DEBUG", "0") == "1"
-    app.run(host="0.0.0.0", port=_port, debug=_debug)
+
+    # Warn if the default admin password ('changeme') is still in use.
+    from werkzeug.security import check_password_hash as _chk
+    _startup_users = load_users()
+    for _u in _startup_users.values():
+        if _chk(_u.password_hash, "changeme"):
+            logger.warning(
+                "SECURITY WARNING: User '%s' is using the default password 'changeme'. "
+                "Change it in config/users.yaml before deploying.",
+                _u.username,
+            )
+
+    # HTTPS support: set HTTPS_ENABLED=1 and provide SSL_CERT_FILE / SSL_KEY_FILE.
+    # When not set, the application runs in HTTP mode (suitable for local use or
+    # when TLS is terminated at a reverse proxy).
+    _ssl_context = None
+    if os.environ.get("HTTPS_ENABLED", "0") == "1":
+        _cert = os.environ.get("SSL_CERT_FILE", "")
+        _key = os.environ.get("SSL_KEY_FILE", "")
+        if _cert and _key:
+            _ssl_context = (_cert, _key)
+            logger.info("HTTPS enabled — cert: %s, key: %s", _cert, _key)
+        else:
+            logger.warning(
+                "HTTPS_ENABLED=1 but SSL_CERT_FILE or SSL_KEY_FILE not set. "
+                "Falling back to HTTP."
+            )
+
+    _scheme = "https" if _ssl_context else "http"
+    logger.info("Starting BMAD v6 Architect on %s://0.0.0.0:%d", _scheme, _port)
+    app.run(host="0.0.0.0", port=_port, debug=_debug, ssl_context=_ssl_context)

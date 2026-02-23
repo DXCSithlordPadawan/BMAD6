@@ -2,9 +2,9 @@
 
 ## 1. Overview
 
-The BMAD v6 Architect is a **single-tenant, single-user** web application intended to be run locally or behind an authenticated reverse proxy. It does not currently implement in-application authentication or authorisation.
+The BMAD v6 Architect implements **in-application authentication and role-based access control (RBAC)** using Flask-Login and HMAC-backed CSRF protection.
 
-All access control is enforced at the **network / infrastructure layer** (see Deployment Guide).
+All users must log in with a username and password before accessing protected routes. Accounts and roles are defined in `config/users.yaml`. Password hashes use Werkzeug's `generate_password_hash` (scrypt by default on Python 3.12+, argon2/pbkdf2 on older systems).
 
 ---
 
@@ -12,33 +12,99 @@ All access control is enforced at the **network / infrastructure layer** (see De
 
 | Role | Description | Access Level |
 |---|---|---|
-| **Anonymous / Unauthenticated** | Any user who reaches the application without a valid session | Read-only: view template list |
-| **Authenticated User** | A user who has been authenticated by the reverse proxy or VPN | Full use: guide, generate, download, amend |
-| **Administrator** | Has shell / filesystem access to the deployment host | Full: manage config, restart service, rotate secrets |
-| **DevOps** | Has container registry and Podman access | Deploy, rollback, monitor container |
-| **Security Lead** | Reviews security posture | Audit logs, approve config changes |
+| **Anonymous / Unauthenticated** | Any user who has not logged in | Read-only: view template list (`GET /`) and login page |
+| **`user`** | A standard authenticated user | Guide, generate, download, dashboard, amend |
+| **`admin`** | Administrator — full in-application access | All routes including amend/edit |
+| **`security_lead`** | Security auditor | Dashboard and template list only |
+| **`devops`** | Infrastructure operator | Template list (read) only; no write routes |
 
 ---
 
 ## 3. RBAC Matrix
 
-| Action | Anonymous | Authenticated User | Administrator | DevOps | Security Lead |
+| Action | Anonymous | `user` | `admin` | `devops` | `security_lead` |
 |---|:---:|:---:|:---:|:---:|:---:|
 | View template list (`GET /`) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Login (`GET/POST /login`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Use guided interview (`GET/POST /guide/<id>`) | ❌ | ✅ | ✅ | ❌ | ❌ |
+| View success page (`GET /success/<name>`) | ❌ | ✅ | ✅ | ❌ | ❌ |
 | View dashboard (`GET /dashboard`) | ❌ | ✅ | ✅ | ❌ | ✅ |
 | Download ZIP (`GET /download/<name>`) | ❌ | ✅ | ✅ | ❌ | ❌ |
 | Amend template defaults (`GET/POST /amend/<id>`) | ❌ | ✅ | ✅ | ❌ | ❌ |
-| Edit `config.yaml` | ❌ | ❌ | ✅ | ✅ | ❌ |
+| Edit `config.yaml` (filesystem) | ❌ | ❌ | ✅ | ✅ | ❌ |
+| Edit `config/users.yaml` (filesystem) | ❌ | ❌ | ✅ | ✅ | ❌ |
 | Rotate `SECRET_KEY` | ❌ | ❌ | ✅ | ✅ | ✅ |
 | Access application logs | ❌ | ❌ | ✅ | ✅ | ✅ |
 | Rebuild and redeploy container | ❌ | ❌ | ❌ | ✅ | ❌ |
 
-> **Note:** The application itself does not enforce the "Anonymous" vs "Authenticated User" distinction. This MUST be implemented at the reverse proxy layer (e.g., nginx `auth_basic`, Traefik forward auth, or VPN requirement).
+> **Note:** Route-level enforcement is performed by the `@login_required` and `@role_required(...)` decorators in `app.py`. Infrastructure-level actions (config editing, log access, container deployment) remain the responsibility of the host OS and container platform.
 
 ---
 
-## 4. Implementing Access Control at the Proxy Layer
+## 4. User Management
+
+### User accounts file: `config/users.yaml`
+
+```yaml
+users:
+  - username: admin
+    password_hash: "<werkzeug hash>"
+    role: admin
+  - username: analyst
+    password_hash: "<werkzeug hash>"
+    role: user
+  - username: auditor
+    password_hash: "<werkzeug hash>"
+    role: security_lead
+```
+
+### Generating a password hash
+
+```bash
+python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('your_secure_password'))"
+```
+
+Paste the output into `password_hash` for the relevant user entry.
+
+### Adding a new user
+
+1. Generate a password hash as above.
+2. Add a new entry to `config/users.yaml`.
+3. Restart the application (the users file is reloaded on each request).
+
+### Changing a password
+
+1. Generate a new hash.
+2. Replace the existing `password_hash` value in `config/users.yaml`.
+3. No restart required (users are loaded per-request).
+
+### Removing a user
+
+Delete the relevant entry from `config/users.yaml`.
+
+> **Security:** Always change the default `admin` password (`changeme`) before deploying to any non-development environment.
+
+---
+
+## 5. Authentication Flow
+
+```
+Browser → GET /protected-route
+         ← 302 /login?next=/protected-route
+
+Browser → POST /login (username, password, _csrf)
+         ← 302 /protected-route  (on success)
+         ← 200 /login            (on failure, with flash message)
+
+Browser → GET /logout
+         ← 302 /login
+```
+
+---
+
+## 6. Implementing Additional Network-Layer Controls
+
+For defence in depth, consider also applying network-layer controls:
 
 ### nginx example (`/etc/nginx/conf.d/bmad.conf`)
 
@@ -61,15 +127,14 @@ server {
 
 ### Alternative: require VPN / Tailscale
 
-Deploy the application on a host accessible only via VPN. This satisfies the "Authenticated User" requirement at the network level.
+Deploy the application on a host accessible only via VPN. This provides a second authentication layer on top of the in-application login.
 
 ---
 
-## 5. Future Enhancements
+## 7. Future Enhancements
 
-If multi-user support is required in a future version, consider integrating:
+If enterprise SSO is required:
 
-- **Flask-Login** for session-based authentication
 - **LDAP / Active Directory** via `flask-ldap3-login`
 - **OAuth2 / OIDC** (e.g., Keycloak, Azure AD) via `Authlib`
-- Database-backed per-user output directories
+- Database-backed per-user output directories for multi-tenant use

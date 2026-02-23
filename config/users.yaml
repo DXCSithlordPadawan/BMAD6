@@ -1,0 +1,23 @@
+# users.yaml — BMAD v6 Template Architect user accounts
+#
+# IMPORTANT: Change all default passwords before deploying to production.
+# Generate a password hash with:
+#   python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('your_password'))"
+#
+# Roles: admin, user, security_lead, devops
+#   admin         — Full application access including amend/edit
+#   user          — Standard access: guide, generate, download, dashboard
+#   security_lead — Dashboard and audit log access only
+#   devops        — No application routes; infrastructure access only
+#
+# WARNING: At minimum, change the admin password before first use.
+#          You may also add, remove, or modify user entries as needed.
+
+users:
+  - username: admin
+    # ⚠️  WARNING: DEFAULT PASSWORD — MUST BE CHANGED BEFORE FIRST USE  ⚠️
+    # Default password: changeme
+    # Generate a new hash:
+    #   python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('your_strong_password'))"
+    password_hash: "scrypt:32768:8:1$Jw0WZymR8khDXN6f$1fcc3c5c2560b82a7008c69ebf3c400f16bbdf01ef745dcdc19abd41450c065559fe4729d9a1920a964aa193397121338a454e333a9a47b5721d3394fd8a0cb1"
+    role: admin

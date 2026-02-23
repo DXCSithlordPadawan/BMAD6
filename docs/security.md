@@ -16,7 +16,7 @@ This document analyses the security posture of the BMAD v6 Template Architect ag
 | A04 | Insecure Design | Security-first architecture; no dynamic template rendering from user input; no `eval()`/`exec()`/`subprocess`. |
 | A05 | Security Misconfiguration | `FLASK_DEBUG=0` by default. `Server` response header removed. Restrictive CSP header applied. |
 | A06 | Vulnerable and Outdated Components | All dependencies pinned to modern, maintained versions in `requirements.txt`. |
-| A07 | Identification and Authentication Failures | App is single-user; authentication delegated to network/proxy layer (see `rbac.md`). |
+| A07 | Identification and Authentication Failures | In-application username/password authentication via Flask-Login. Passwords stored as Werkzeug scrypt hashes (≥256-bit output). CSRF token required on login POST. Unauthenticated access to protected routes redirects to `/login`. |
 | A08 | Software and Data Integrity Failures | No external resource loading; no CDN JS/CSS. `bmad_library.json` written atomically via Python's file write. |
 | A09 | Security Logging and Monitoring Failures | Python `logging` module used for all security-relevant events (CSRF failures, ZIP downloads, amend operations). |
 | A10 | Server-Side Request Forgery (SSRF) | Application makes no outbound HTTP requests. |
@@ -27,11 +27,11 @@ This document analyses the security posture of the BMAD v6 Template Architect ag
 
 | Control | Control Name | Implementation |
 |---|---|---|
-| AC-3 | Access Enforcement | Network-layer access control (see RBAC doc). |
-| AC-17 | Remote Access | HTTPS enforced via reverse proxy in production. |
+| AC-3 | Access Enforcement | Route-level RBAC via `@login_required` and `@role_required()` decorators. Four roles enforced in application code. |
+| AC-17 | Remote Access | HTTPS supported natively via `HTTPS_ENABLED=1` + cert/key env vars, or via reverse proxy. |
 | AU-2 | Event Logging | Application-level logging of CSRF failures and file operations. |
-| IA-5 | Authenticator Management | `SECRET_KEY` ≥256 bits, environment-injected, never hard-coded. |
-| SC-8 | Transmission Confidentiality and Integrity | TLS 1.2+ via reverse proxy (not terminated at Flask). |
+| IA-5 | Authenticator Management | `SECRET_KEY` ≥256 bits, environment-injected. Passwords hashed with Werkzeug scrypt (never stored in plaintext). Default admin password documented as requiring immediate rotation. |
+| SC-8 | Transmission Confidentiality and Integrity | TLS 1.2+ via reverse proxy (recommended) or direct Flask HTTPS via `HTTPS_ENABLED=1`. |
 | SC-28 | Protection of Information at Rest | Output files stored with OS-default permissions; container runs as non-root user. |
 | SI-10 | Information Input Validation | Regex-based name sanitisation; length limits; no unvalidated file paths. |
 | SI-15 | Information Output Filtering | Jinja2 auto-escaping; `markupsafe.escape()` on reflected content. |
@@ -82,7 +82,7 @@ This document analyses the security posture of the BMAD v6 Template Architect ag
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| No in-application authentication | Medium | Mitigated by network-layer controls (VPN, nginx auth). Must be addressed before internet-facing deployment. |
+| No in-application authentication | ~~Medium~~ | **Resolved** — Flask-Login with username/password and role-based access control implemented. |
 | `bmad_library.json` is writable by the application | Low | Acceptable for single-user deployment. In multi-user deployments, mount `config/` read-only and disable the amend route. |
 | Flask development server used in production | High | Use a production WSGI server (Gunicorn or Waitress) — see `deployment.md`. |
 | No rate limiting | Low | Add nginx rate limiting (`limit_req_zone`) if exposed beyond localhost. |
@@ -92,10 +92,11 @@ This document analyses the security posture of the BMAD v6 Template Architect ag
 ## 8. Security Checklist for Deployment
 
 - [ ] Set `SECRET_KEY` to a 64-character random hex string in `.env`
+- [ ] **Change the default `admin` password in `config/users.yaml` before first use**
 - [ ] Set `FLASK_DEBUG=0`
-- [ ] Deploy behind HTTPS reverse proxy (TLS 1.2+)
+- [ ] Deploy behind HTTPS reverse proxy (TLS 1.2+) or set `HTTPS_ENABLED=1` with valid cert/key
 - [ ] Restrict access by IP or VPN
 - [ ] Run container as non-root user (default in provided `Containerfile`)
 - [ ] Review and restrict file system permissions on `bmad_output/`
 - [ ] Rotate `SECRET_KEY` periodically (quarterly recommended)
-- [ ] Monitor application logs for CSRF warning events
+- [ ] Monitor application logs for CSRF warning events and failed login attempts

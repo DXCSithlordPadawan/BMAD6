@@ -24,11 +24,46 @@ pip install -r requirements.txt
 cp .env.example .env
 # Set SECRET_KEY to a random 64-char hex string in .env
 
-# 5. Start
+# 5. Change the default admin password
+python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('your_secure_password'))"
+# Paste the hash into config/users.yaml
+
+# 6. Start
 python app.py
 ```
 
-Open **http://localhost:8000** in your browser.
+Open **http://localhost:8000** and sign in with your credentials.
+
+> **Default credentials:** `admin` / `changeme` — change immediately before deploying.
+
+---
+
+## 🔒 Authentication and RBAC
+
+The application uses **username/password authentication** (Flask-Login) with **role-based access control**:
+
+| Role | Access |
+|---|---|
+| `admin` | Full access — all routes |
+| `user` | Guide, generate, download, dashboard, amend |
+| `security_lead` | Dashboard and template list |
+| `devops` | Template list only (infrastructure role) |
+
+User accounts are managed in `config/users.yaml`. See [`docs/rbac.md`](docs/rbac.md) for details.
+
+---
+
+## 🔐 HTTPS Support
+
+Run with native TLS by setting environment variables:
+
+```bash
+HTTPS_ENABLED=1
+SSL_CERT_FILE=/path/to/cert.pem
+SSL_KEY_FILE=/path/to/key.pem
+```
+
+Or terminate TLS at a reverse proxy (nginx, Traefik) — see [`docs/deployment.md`](docs/deployment.md).
 
 ---
 
@@ -70,6 +105,7 @@ BMAD6/
 ├── .env.example         # Environment variable template
 ├── config/
 │   ├── config.yaml      # Application settings
+│   ├── users.yaml       # User accounts (hashed passwords, roles)
 │   └── bmad_library.json # Template library
 ├── templates/           # Jinja2 HTML templates
 ├── static/css/          # Dark-mode stylesheet
