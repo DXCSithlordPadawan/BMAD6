@@ -112,8 +112,8 @@ def get_output_dir() -> Path:
 
 #: Valid application roles and which routes they may access.
 ROLE_PERMISSIONS: dict[str, set[str]] = {
-    "admin": {"index", "guide", "dashboard", "success", "download_zip", "amend_template", "delete_agent"},
-    "user": {"index", "guide", "dashboard", "success", "download_zip", "amend_template", "delete_agent"},
+    "admin": {"index", "guide", "dashboard", "success", "download_zip", "amend_template", "delete_agent", "import_template"},
+    "user": {"index", "guide", "dashboard", "success", "download_zip", "amend_template", "delete_agent", "import_template"},
     "security_lead": {"index", "dashboard"},
     "devops": {"index"},
 }
@@ -215,6 +215,7 @@ app.jinja_env.globals["csrf_token"] = _csrf_token
 # ── Input Sanitisation ─────────────────────────────────────────────────────────
 _MAX_NAME_LEN = 100
 _MAX_SECTION_LEN = 8192
+_MAX_MD_UPLOAD_BYTES = 512_000  # 500 KB — reasonable upper bound for a template
 _SAFE_NAME_RE = re.compile(r"[^\w\s\-]")  # allow word chars, spaces, hyphens
 
 
@@ -228,6 +229,82 @@ def sanitise_name(value: str) -> str:
 def sanitise_content(value: str) -> str:
     """Trim oversized section content. Jinja2 auto-escapes on render."""
     return str(value)[:_MAX_SECTION_LEN]
+
+
+# ── Markdown Template Parser ───────────────────────────────────────────────────
+_MAX_SECTION_KEY_LEN = 60
+_SAFE_KEY_RE = re.compile(r"[^\w\s\-]")
+
+
+def _to_section_key(heading: str) -> str:
+    """Convert a Markdown heading string to a safe snake_case section key."""
+    key = heading.strip()
+    key = _SAFE_KEY_RE.sub("", key)
+    key = key.strip().lower().replace(" ", "_").replace("-", "_")
+    key = re.sub(r"_+", "_", key)
+    return key[:_MAX_SECTION_KEY_LEN] or "section"
+
+
+def parse_md_to_template(md_text: str) -> dict:
+    """Parse a BMAD v6 Markdown file and return a template dict.
+
+    Expected format::
+
+        # Template Name
+        [optional: is_agent: true|false]
+
+        ## Section One
+        Content for section one.
+
+        ## Section Two
+        Content for section two.
+
+    Rules:
+    - The first ``# `` heading becomes the template name.
+    - Every ``## `` heading opens a new section; its key is the heading text
+      normalised to snake_case.
+    - A line ``is_agent: true`` (case-insensitive) anywhere in the file marks
+      the template as an agent; ``is_agent: false`` marks it as a document.
+      When absent the template defaults to *agent* (``True``).
+    - Section content is trimmed to ``_MAX_SECTION_LEN`` characters.
+    """
+    lines = md_text.splitlines()
+
+    name = "Imported Template"
+    is_agent = True
+    sections: dict[str, str] = {}
+    current_key: str | None = None
+    current_lines: list[str] = []
+
+    for line in lines:
+        low = line.strip().lower()
+        if low == "is_agent: true":
+            is_agent = True
+            continue
+        if low == "is_agent: false":
+            is_agent = False
+            continue
+
+        if line.startswith("# ") and name == "Imported Template":
+            name = line[2:].strip() or name
+            continue
+
+        if line.startswith("## "):
+            if current_key is not None:
+                sections[current_key] = "\n".join(current_lines).strip()[
+                    :_MAX_SECTION_LEN
+                ]
+            current_key = _to_section_key(line[3:])
+            current_lines = []
+            continue
+
+        if current_key is not None:
+            current_lines.append(line)
+
+    if current_key is not None:
+        sections[current_key] = "\n".join(current_lines).strip()[:_MAX_SECTION_LEN]
+
+    return {"name": name, "is_agent": is_agent, "sections": sections}
 
 
 # ── Security Response Headers ──────────────────────────────────────────────────
@@ -526,6 +603,96 @@ def amend_template(template_id: int):
         template_id=template_id,
         config=config,
     )
+
+
+@app.route("/import", methods=["GET", "POST"])
+@login_required
+@role_required("admin", "user")
+def import_template():
+    """Import a BMAD v6 template or agent from an uploaded Markdown (.md) file.
+
+    The file is parsed by ``parse_md_to_template``:
+    - The first ``# Heading`` becomes the template name.
+    - Every ``## Heading`` opens a new section.
+    - A line ``is_agent: true/false`` controls the template type.
+
+    The resulting template is appended to ``config/bmad_library.json`` so it
+    appears on the index page and can be run via the guided interview.
+    """
+    config = load_config()
+
+    if request.method == "POST":
+        if not _validate_csrf(request.form.get("_csrf")):
+            logger.warning("CSRF validation failed on /import")
+            abort(403)
+
+        uploaded = request.files.get("md_file")
+        if not uploaded or not uploaded.filename:
+            flash("No file selected. Please choose a Markdown (.md) file.", "warning")
+            return render_template("import.html", config=config)
+
+        filename = uploaded.filename
+        if not filename.lower().endswith(".md"):
+            flash("Only Markdown (.md) files are accepted.", "warning")
+            return render_template("import.html", config=config)
+
+        # Check file size before reading to prevent memory exhaustion.
+        uploaded.seek(0, os.SEEK_END)
+        file_size = uploaded.tell()
+        uploaded.seek(0)
+        if file_size > _MAX_MD_UPLOAD_BYTES:
+            flash("File is too large. Maximum size is 500 KB.", "warning")
+            return render_template("import.html", config=config)
+
+        raw_bytes = uploaded.read()
+
+        try:
+            md_text = raw_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            flash("File could not be decoded as UTF-8 text.", "warning")
+            return render_template("import.html", config=config)
+
+        new_entry = parse_md_to_template(md_text)
+
+        if not new_entry.get("sections"):
+            flash(
+                "No sections found. Ensure the file contains ## headings for each section.",
+                "warning",
+            )
+            return render_template("import.html", config=config)
+
+        # Persist to the library, stripping injected ids first.
+        templates = load_library()
+        raw_templates = [{k: v for k, v in t.items() if k != "id"} for t in templates]
+
+        # Avoid duplicate names — update existing entry if name matches.
+        existing_idx = next(
+            (i for i, t in enumerate(raw_templates) if t["name"] == new_entry["name"]),
+            None,
+        )
+        if existing_idx is not None:
+            raw_templates[existing_idx] = new_entry
+            action = "updated"
+        else:
+            raw_templates.append(new_entry)
+            action = "imported"
+
+        with open(LIBRARY_PATH, "w", encoding="utf-8") as fh:
+            json.dump(raw_templates, fh, indent=2, ensure_ascii=False)
+
+        logger.info(
+            "Template '%s' %s from uploaded file '%s'.",
+            new_entry["name"],
+            action,
+            filename,
+        )
+        flash(
+            f"Template '{escape(new_entry['name'])}' {action} successfully.",
+            "success",
+        )
+        return redirect(url_for("index"))
+
+    return render_template("import.html", config=config)
 
 
 # ── Error Handlers ─────────────────────────────────────────────────────────────

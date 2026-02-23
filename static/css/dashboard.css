@@ -408,3 +408,31 @@ hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
   font-size: 0.8rem;
   border-top: 1px solid var(--border);
 }
+
+/* ── Import Page ────────────────────────────────────────────────────────── */
+.file-input {
+  display: block;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  width: 100%;
+  max-width: 480px;
+}
+
+.file-input:focus { outline: 2px solid var(--accent-blue); }
+
+.code-block {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  white-space: pre;
+  overflow-x: auto;
+  line-height: 1.6;
+}
