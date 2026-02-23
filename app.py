@@ -248,7 +248,12 @@ def _to_section_key(heading: str) -> str:
 def parse_md_to_template(md_text: str) -> dict:
     """Parse a BMAD v6 Markdown file and return a template dict.
 
-    Expected format::
+    Expected format (with optional YAML frontmatter)::
+
+        ---
+        name: Template Name
+        is_agent: true
+        ---
 
         # Template Name
         [optional: is_agent: true|false]
@@ -260,10 +265,13 @@ def parse_md_to_template(md_text: str) -> dict:
         Content for section two.
 
     Rules:
-    - The first ``# `` heading becomes the template name.
+    - YAML frontmatter (``---`` delimited block) is parsed first; ``name``
+      and ``is_agent`` values there take precedence unless overridden later.
+    - The first ``# `` heading becomes the template name if not set via
+      frontmatter.
     - Every ``## `` heading opens a new section; its key is the heading text
       normalised to snake_case.
-    - A line ``is_agent: true`` (case-insensitive) anywhere in the file marks
+    - A line ``is_agent: true`` (case-insensitive) anywhere in the body marks
       the template as an agent; ``is_agent: false`` marks it as a document.
       When absent the template defaults to *agent* (``True``).
     - Section content is trimmed to ``_MAX_SECTION_LEN`` characters.
@@ -276,7 +284,23 @@ def parse_md_to_template(md_text: str) -> dict:
     current_key: str | None = None
     current_lines: list[str] = []
 
-    for line in lines:
+    # Parse YAML frontmatter if present (--- ... ---)
+    start = 0
+    if lines and lines[0].strip() == "---":
+        end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+        if end is not None:
+            try:
+                fm = yaml.safe_load("\n".join(lines[1:end])) or {}
+                if isinstance(fm, dict):
+                    if "name" in fm:
+                        name = str(fm["name"])
+                    if "is_agent" in fm:
+                        is_agent = bool(fm["is_agent"])
+            except yaml.YAMLError:
+                pass
+            start = end + 1
+
+    for line in lines[start:]:
         low = line.strip().lower()
         if low == "is_agent: true":
             is_agent = True
