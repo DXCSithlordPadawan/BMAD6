@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ config.icon }} Guide — {{ template.name }}{% endblock %}
+{% block content %}
+<h1>{{ config.icon }} {{ template.name }}</h1>
+<p class="subtitle">
+  Complete each section below. Each section becomes a separate Markdown shard
+  in your BMAD v6 output.
+</p>
+<p class="progress-label">{{ total_steps }} section(s) to complete.</p>
+
+<form method="post" action="{{ url_for('guide', template_id=template_id) }}" novalidate>
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+
+  <div class="form-field">
+    <label for="agent_name">
+      <strong>Step 0 of {{ total_steps }}: Output Name</strong><br>
+      <small>A unique name for this agent or document (used as the folder name).</small>
+    </label>
+    <input
+      type="text"
+      id="agent_name"
+      name="agent_name"
+      value="{{ template.name }}"
+      maxlength="100"
+      required
+      class="text-input"
+    >
+  </div>
+
+  {% for step_idx, (key, default_value) in enumerated_sections %}
+  <div class="section-guide">
+    <h3>Step {{ step_idx + 1 }} of {{ total_steps }}: {{ key.replace('_', ' ').title() }}</h3>
+    <p><em>This shard will be saved as <code>step-{{ "%02d"|format(step_idx) }}_{{ key }}.md</code></em></p>
+    <textarea
+      name="{{ key }}"
+      id="section_{{ key }}"
+      rows="8"
+      maxlength="8192"
+      class="section-textarea"
+    >{{ default_value }}</textarea>
+  </div>
+  {% endfor %}
+
+  <div class="form-actions">
+    <button type="submit" class="btn-primary btn-large">
+      ✅ Generate BMAD v6 Document
+    </button>
+    <a href="{{ url_for('index') }}" class="btn-secondary">← Back to Templates</a>
+  </div>
+</form>
+{% endblock %}
