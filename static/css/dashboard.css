@@ -249,6 +249,22 @@ hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
 .btn-sm { padding: 4px 10px; font-size: 0.85rem; }
 .btn-large { padding: 12px 28px; font-size: 1rem; }
 
+.btn-danger {
+  background-color: var(--danger);
+  color: var(--text-white);
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: inline-block;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.btn-danger:hover { opacity: 0.85; text-decoration: none; }
+
 /* ── Dashboard Table ─────────────────────────────────────────────────────── */
 .agent-table {
   width: 100%;
@@ -302,6 +318,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
   font-size: 0.875rem;
   resize: vertical;
   min-height: 120px;
+  overflow-y: auto;
 }
 
 .section-textarea:focus {

@@ -18,6 +18,7 @@ import logging
 import os
 import re
 import secrets
+import shutil
 import zipfile
 from pathlib import Path
 
@@ -111,8 +112,8 @@ def get_output_dir() -> Path:
 
 #: Valid application roles and which routes they may access.
 ROLE_PERMISSIONS: dict[str, set[str]] = {
-    "admin": {"index", "guide", "dashboard", "success", "download_zip", "amend_template"},
-    "user": {"index", "guide", "dashboard", "success", "download_zip", "amend_template"},
+    "admin": {"index", "guide", "dashboard", "success", "download_zip", "amend_template", "delete_agent"},
+    "user": {"index", "guide", "dashboard", "success", "download_zip", "amend_template", "delete_agent"},
     "security_lead": {"index", "dashboard"},
     "devops": {"index"},
 }
@@ -360,6 +361,19 @@ def guide(template_id: int):
         (output_dir / "agent.md").write_text(master_md, encoding="utf-8")
         logger.info("Generated master agent.md for '%s'", agent_name)
 
+        # 5. Generate amalgamated single Markdown document
+        amalgam_parts = [
+            f"# {kind}: {agent_name} {icon}\n\n"
+            f"**System Title:** {app_title}\n\n"
+        ]
+        for key, content in filled.items():
+            title = key.replace("_", " ").title()
+            amalgam_parts.append(f"## {title}\n\n{content}\n\n")
+        amalgam_md = "".join(amalgam_parts)
+        amalgam_filename = f"{agent_name}_complete.md"
+        (output_dir / amalgam_filename).write_text(amalgam_md, encoding="utf-8")
+        logger.info("Generated amalgamated document '%s' for '%s'", amalgam_filename, agent_name)
+
         return redirect(url_for("success", agent_name=agent_name))
 
     # GET — render guided form
@@ -442,6 +456,34 @@ def download_zip(agent_name: str):
         as_attachment=True,
         download_name=f"{safe_name}.zip",
     )
+
+
+@app.route("/delete/<agent_name>", methods=["POST"])
+@login_required
+@role_required("admin", "user")
+def delete_agent(agent_name: str):
+    """Delete a generated agent/document directory from the output folder."""
+    if not _validate_csrf(request.form.get("_csrf")):
+        logger.warning("CSRF validation failed for delete agent '%s'", agent_name)
+        abort(403)
+
+    safe_name = sanitise_name(agent_name)
+    output_root = get_output_dir()
+    agent_dir = (output_root / safe_name).resolve()
+
+    # Path-traversal guard: the resolved agent dir must be a child of output_root.
+    try:
+        agent_dir.relative_to(output_root.resolve())
+    except ValueError:
+        abort(403)
+
+    if not agent_dir.exists() or not agent_dir.is_dir():
+        abort(404)
+
+    shutil.rmtree(agent_dir)
+    logger.info("Deleted agent directory: '%s'", safe_name)
+    flash(f"'{safe_name}' has been deleted.", "success")
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/amend/<int:template_id>", methods=["GET", "POST"])
