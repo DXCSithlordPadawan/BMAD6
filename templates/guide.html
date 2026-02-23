@@ -3,8 +3,8 @@
 {% block content %}
 <h1>{{ config.icon }} {{ template.name }}</h1>
 <p class="subtitle">
-  Complete each section below. Each section becomes a separate Markdown shard
-  in your BMAD v6 output.
+  Complete each section below. All sections will be combined into a single
+  amalgamated Markdown document, and each section is also saved as a separate shard.
 </p>
 <p class="progress-label">{{ total_steps }} section(s) to complete.</p>
 
@@ -13,8 +13,8 @@
 
   <div class="form-field">
     <label for="agent_name">
-      <strong>Step 0 of {{ total_steps }}: Output Name</strong><br>
-      <small>A unique name for this agent or document (used as the folder name).</small>
+      <strong>Step 0 of {{ total_steps }}: Report Name</strong><br>
+      <small>A unique name for this report (used as the folder and file name).</small>
     </label>
     <input
       type="text"
@@ -30,7 +30,7 @@
   {% for step_idx, (key, default_value) in enumerated_sections %}
   <div class="section-guide">
     <h3>Step {{ step_idx + 1 }} of {{ total_steps }}: {{ key.replace('_', ' ').title() }}</h3>
-    <p><em>This shard will be saved as <code>step-{{ "%02d"|format(step_idx) }}_{{ key }}.md</code></em></p>
+    <p><em>This section will be saved as <code>step-{{ "%02d"|format(step_idx) }}_{{ key }}.md</code> and included in the amalgamated document.</em></p>
     <textarea
       name="{{ key }}"
       id="section_{{ key }}"
