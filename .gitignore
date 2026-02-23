@@ -1,0 +1,39 @@
+# .gitignore — BMAD v6 Architect
+
+# Generated BMAD output — do not commit generated agents/documents
+bmad_output/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment secrets — NEVER commit
+.env
+
+# Pytest / coverage
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS artefacts
+.DS_Store
+Thumbs.db

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>{% block title %}{{ config.icon }} {{ config.application_title }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+  <nav class="nav-bar">
+    <span class="nav-brand">{{ config.icon }} {{ config.application_title }}</span>
+    <span class="nav-links">
+      <a href="{{ url_for('index') }}">Templates</a>
+      <a href="{{ url_for('dashboard') }}">Dashboard</a>
+    </span>
+  </nav>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">
+    <small>BMAD v6 Template Architect &mdash; <em>Generating sharded AI agents since 2024</em></small>
+  </footer>
+</body>
+</html>

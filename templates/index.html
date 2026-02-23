@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ config.icon }} Templates — {{ config.application_title }}{% endblock %}
+{% block content %}
+<h1>{{ config.icon }} Choose a Template</h1>
+<p class="subtitle">Select an Agent or Document template below to begin the guided interview.</p>
+
+<div class="card-grid">
+  {% for t in templates %}
+  <div class="card {% if t.is_agent %}card-agent{% else %}card-doc{% endif %}">
+    <div class="card-header">
+      <span class="card-type-badge">{% if t.is_agent %}Agent{% else %}Document{% endif %}</span>
+      <h3>{{ t.name }}</h3>
+    </div>
+    <div class="card-body">
+      <p>{{ t.sections | length }} section(s)</p>
+      <ul class="section-list">
+        {% for key in t.sections %}
+        <li>{{ key.replace('_', ' ').title() }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="card-actions">
+      <a href="{{ url_for('guide', template_id=t.id) }}" class="btn-primary">▶ Start Guide</a>
+      <a href="{{ url_for('amend_template', template_id=t.id) }}" class="btn-secondary">✏ Edit Defaults</a>
+    </div>
+  </div>
+  {% else %}
+  <p>No templates found. Check <code>config/bmad_library.json</code>.</p>
+  {% endfor %}
+</div>
+{% endblock %}

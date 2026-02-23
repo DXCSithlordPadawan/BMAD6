@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ config.icon }} Generated — {{ agent_name }}{% endblock %}
+{% block content %}
+<div class="success-box">
+  <h1>✅ Successfully Generated!</h1>
+  <p>
+    Your BMAD v6 sharded document <strong>{{ agent_name }}</strong> has been created.
+  </p>
+
+  <h3>Generated Files</h3>
+  <ul class="file-list">
+    {% for f in files %}
+    <li>📄 <code>{{ f }}</code></li>
+    {% else %}
+    <li>No files found.</li>
+    {% endfor %}
+  </ul>
+
+  <div class="form-actions">
+    <a href="{{ url_for('download_zip', agent_name=agent_name) }}" class="btn-primary">
+      ⬇ Download ZIP
+    </a>
+    <a href="{{ url_for('dashboard') }}" class="btn-secondary">📊 Go to Dashboard</a>
+    <a href="{{ url_for('index') }}" class="btn-secondary">+ Create Another</a>
+  </div>
+</div>
+{% endblock %}

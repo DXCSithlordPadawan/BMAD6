@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ config.icon }} Edit Defaults — {{ template.name }}{% endblock %}
+{% block content %}
+<h1>{{ config.icon }} Edit Default Sections</h1>
+<p class="subtitle">
+  Update the default placeholder text for <strong>{{ template.name }}</strong>.
+  These values appear pre-filled when a user opens the guide.
+</p>
+
+<form method="post" action="{{ url_for('amend_template', template_id=template_id) }}" novalidate>
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+
+  {% for key, default_value in template.sections.items() %}
+  <div class="section-guide">
+    <h3>{{ key.replace('_', ' ').title() }}</h3>
+    <textarea
+      name="{{ key }}"
+      rows="5"
+      maxlength="8192"
+      class="section-textarea"
+    >{{ default_value }}</textarea>
+  </div>
+  {% endfor %}
+
+  <div class="form-actions">
+    <button type="submit" class="btn-primary">💾 Save Defaults</button>
+    <a href="{{ url_for('index') }}" class="btn-secondary">← Cancel</a>
+  </div>
+</form>
+{% endblock %}
