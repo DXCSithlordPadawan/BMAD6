@@ -31,15 +31,32 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and set a strong SECRET_KEY (min 32 chars)
 
-# 5. Start the application
+# 5. Change the default admin password
+python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('your_secure_password'))"
+# Paste the output hash into config/users.yaml
+
+# 6. Start the application
 python app.py
 ```
 
-Open your browser at **http://localhost:8000**.
+Open your browser at **http://localhost:8000** — you will be redirected to the login page.
 
 ---
 
-## 3. Walkthrough
+## 3. Signing In
+
+The application requires authentication. On first visit you will be redirected to `/login`.
+
+1. Enter your **username** and **password**.
+2. Click **🔐 Sign In**.
+
+On successful login you are redirected to the template list. Your username and role are shown in the navigation bar. Click **🚪 Logout** to end your session.
+
+> **Default credentials:** `admin` / `changeme`. Change this immediately — see Section 9.
+
+---
+
+## 4. Walkthrough
 
 ### Step 1 — Choose a Template
 
@@ -82,7 +99,7 @@ Click **⬇ Download ZIP** to receive all files as a single archive.
 
 ---
 
-## 4. Dashboard
+## 5. Dashboard
 
 The **Dashboard** (`/dashboard`) lists all previously generated agents and documents. From here you can:
 
@@ -91,7 +108,7 @@ The **Dashboard** (`/dashboard`) lists all previously generated agents and docum
 
 ---
 
-## 5. Editing Template Defaults
+## 6. Editing Template Defaults
 
 If you regularly use a template but always change the same text, you can update the default content:
 
@@ -103,7 +120,7 @@ Changes are saved back to `config/bmad_library.json`.
 
 ---
 
-## 6. Configuration
+## 7. Configuration
 
 Edit `config/config.yaml` to change application-wide settings:
 
@@ -125,7 +142,7 @@ app_settings:
 
 ---
 
-## 7. Adding Custom Templates
+## 8. Adding Custom Templates
 
 Edit `config/bmad_library.json` to add your own templates:
 
@@ -146,7 +163,28 @@ Edit `config/bmad_library.json` to add your own templates:
 
 ---
 
-## 8. Frequently Asked Questions
+## 9. User Management
+
+User accounts are defined in `config/users.yaml`. To add or change a user:
+
+1. Generate a password hash:
+   ```bash
+   python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('new_password'))"
+   ```
+2. Edit `config/users.yaml` and add or update the entry:
+   ```yaml
+   users:
+     - username: myuser
+       password_hash: "<paste hash here>"
+       role: user   # or: admin, security_lead, devops
+   ```
+3. Save the file — no restart required.
+
+See [`docs/rbac.md`](rbac.md) for a full description of roles and permissions.
+
+---
+
+## 10. Frequently Asked Questions
 
 **Q: Where are generated files stored?**
 A: In `bmad_output/<agent_name>/` relative to the project root. This directory is gitignored.
@@ -159,3 +197,9 @@ A: Copy `.env.example` to `.env` and set `SECRET_KEY` to a random string of at l
 
 **Q: How do I run on a different port?**
 A: Change `web_port` in `config/config.yaml`.
+
+**Q: How do I enable HTTPS?**
+A: Set `HTTPS_ENABLED=1`, `SSL_CERT_FILE`, and `SSL_KEY_FILE` in your `.env` file. See [`docs/deployment.md`](deployment.md) for details.
+
+**Q: I've forgotten the admin password.**
+A: Generate a new hash with `werkzeug.security.generate_password_hash` and replace the `password_hash` value in `config/users.yaml`.

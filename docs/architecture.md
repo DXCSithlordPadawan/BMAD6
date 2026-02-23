@@ -10,8 +10,10 @@ The **BMAD v6 Template Architect** is a lightweight Python Flask web application
 
 ```mermaid
 flowchart TD
-    Browser["User Browser"] -->|HTTP| Flask["Flask App (app.py)"]
+    Browser["User Browser"] -->|HTTP/HTTPS| Login["Login Page (/login)"]
+    Login -->|Authenticated| Flask["Flask App (app.py)"]
     Flask -->|reads| Config["config/config.yaml"]
+    Flask -->|reads| Users["config/users.yaml"]
     Flask -->|reads / writes| Library["config/bmad_library.json"]
     Flask -->|writes shards| Output["bmad_output/<agent_name>/"]
     Flask -->|renders| Templates["templates/*.html"]
@@ -25,8 +27,9 @@ flowchart TD
 
 | Component | File(s) | Responsibility |
 |---|---|---|
-| **Flask App** | `app.py` | Route handling, CSRF, sharding logic, security headers |
+| **Flask App** | `app.py` | Route handling, authentication, RBAC, CSRF, sharding logic, security headers |
 | **Config** | `config/config.yaml` | Application settings (title, port, output dir, icon) |
+| **Users** | `config/users.yaml` | User accounts with hashed passwords and roles |
 | **Template Library** | `config/bmad_library.json` | Defines agent/document templates and their default section text |
 | **HTML Templates** | `templates/*.html` | Jinja2 templates rendered by Flask |
 | **Stylesheet** | `static/css/dashboard.css` | Dark-mode UI CSS |
@@ -64,6 +67,14 @@ sequenceDiagram
     participant F as Flask App
     participant FS as Filesystem
 
+    U->>F: GET /guide/<id> (unauthenticated)
+    F-->>U: 302 /login?next=/guide/<id>
+
+    U->>F: POST /login (username, password, _csrf)
+    F->>FS: read config/users.yaml
+    F->>F: verify password hash + role
+    F-->>U: 302 /guide/<id>
+
     U->>F: GET /guide/<id>
     F->>FS: read config.yaml + bmad_library.json
     F-->>U: render guide.html (pre-filled form)
@@ -86,8 +97,12 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    Request["Incoming HTTP Request"] --> Headers["Security Headers\n(after_request hook)"]
-    Headers --> CSRF["CSRF Token Validation\n(POST routes only)"]
+    Request["Incoming HTTP/HTTPS Request"] --> Headers["Security Headers\n(after_request hook)"]
+    Headers --> Auth["Authentication Check\n(@login_required)"]
+    Auth -->|Not authenticated| LoginRedirect["302 /login"]
+    Auth -->|Authenticated| RBAC["Role Check\n(@role_required)"]
+    RBAC -->|Insufficient role| Forbidden["403 Forbidden"]
+    RBAC -->|Role permitted| CSRF["CSRF Token Validation\n(POST routes only)"]
     CSRF --> Input["Input Sanitisation\n(name + content)"]
     Input --> PathGuard["Path-Traversal Guard\n(resolve + relative_to)"]
     PathGuard --> Logic["Business Logic"]
@@ -110,11 +125,13 @@ BMAD6/
 │
 ├── config/
 │   ├── config.yaml          # Application settings
+│   ├── users.yaml           # User accounts (usernames, hashed passwords, roles)
 │   └── bmad_library.json    # Template library (agents + documents)
 │
 ├── templates/               # Jinja2 HTML templates
 │   ├── base.html
 │   ├── index.html
+│   ├── login.html
 │   ├── guide.html
 │   ├── dashboard.html
 │   ├── success.html
@@ -159,6 +176,7 @@ BMAD6/
 |---|---|---|
 | Language | Python | 3.12+ |
 | Web Framework | Flask | 3.0+ |
+| Authentication | Flask-Login | 0.6+ |
 | Templating | Jinja2 | (bundled with Flask) |
 | Config Parsing | PyYAML | 6.0+ |
 | Env Management | python-dotenv | 1.0+ |

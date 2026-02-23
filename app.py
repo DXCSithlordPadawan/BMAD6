@@ -160,7 +160,13 @@ def user_loader(user_id: str):
 
 
 def role_required(*roles: str):
-    """Decorator: abort 403 if the current user's role is not in *roles*."""
+    """Decorator: redirect to login if unauthenticated, abort 403 if role not in *roles*.
+
+    Must be applied after ``@login_required`` in the decorator stack so that
+    Flask-Login's redirect logic runs first when the user is not authenticated.
+    The check at line 168 is a defence-in-depth fallback for direct use without
+    ``@login_required``.
+    """
 
     def decorator(fn):
         @functools.wraps(fn)
@@ -511,6 +517,17 @@ if __name__ == "__main__":
     _port = int(_config.get("web_port", 8000))
     # SECURITY: debug mode must never be enabled in production.
     _debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+
+    # Warn if the default admin password ('changeme') is still in use.
+    from werkzeug.security import check_password_hash as _chk
+    _startup_users = load_users()
+    for _u in _startup_users.values():
+        if _chk(_u.password_hash, "changeme"):
+            logger.warning(
+                "SECURITY WARNING: User '%s' is using the default password 'changeme'. "
+                "Change it in config/users.yaml before deploying.",
+                _u.username,
+            )
 
     # HTTPS support: set HTTPS_ENABLED=1 and provide SSL_CERT_FILE / SSL_KEY_FILE.
     # When not set, the application runs in HTTP mode (suitable for local use or
