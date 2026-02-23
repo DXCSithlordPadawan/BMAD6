@@ -28,4 +28,9 @@
   <p>No templates found. Check <code>config/bmad_library.json</code>.</p>
   {% endfor %}
 </div>
+
+{% if current_user.is_authenticated %}
+<br>
+<a href="{{ url_for('import_template') }}" class="btn-secondary">📥 Import Template / Agent</a>
+{% endif %}
 {% endblock %}

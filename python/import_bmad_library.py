@@ -1,27 +1,135 @@
 import json
 import os
-from django.core.management.base import BaseCommand
-from your_app.models import BMADTemplate
+import re
 
-class Command(BaseCommand):
-    help = 'Imports a library of BMAD v6 templates from a JSON file'
+# ── MD Parsing ─────────────────────────────────────────────────────────────────
 
-    def add_arguments(self, parser):
-        parser.add_argument('file_path', type=str, help='Path to the library.json file')
+_MAX_SECTION_KEY_LEN = 60
+_MAX_SECTION_CONTENT_LEN = 8192
+_SAFE_KEY_RE = re.compile(r"[^\w\s\-]")
 
-    def handle(self, *args, **options):
-        path = options['file_path']
-        if not os.path.exists(path):
-            self.stderr.write(f"File not found: {path}")
-            return
 
-        with open(path, 'r') as f:
-            data = json.load(f)
+def _to_section_key(heading: str) -> str:
+    """Convert a Markdown heading string to a safe snake_case section key."""
+    key = heading.strip()
+    key = _SAFE_KEY_RE.sub("", key)
+    key = key.strip().lower().replace(" ", "_").replace("-", "_")
+    key = re.sub(r"_+", "_", key)
+    return key[:_MAX_SECTION_KEY_LEN] or "section"
 
-        for item in data:
-            template, created = BMADTemplate.objects.get_or_create(
-                name=item['name'],
-                defaults={'sections': item['sections'], 'is_agent': item.get('is_agent', True)}
+
+def parse_md_to_template(md_text: str) -> dict:
+    """Parse a BMAD v6 Markdown file and return a template dict.
+
+    Expected format::
+
+        # Template Name
+        [optional: is_agent: true|false]
+
+        ## Section One
+        Content for section one.
+
+        ## Section Two
+        Content for section two.
+
+    Rules:
+    - The first ``# `` heading becomes the template name.
+    - Every ``## `` heading opens a new section; its key is the heading text
+      normalised to snake_case.
+    - A line matching ``is_agent: true`` (case-insensitive) anywhere in the
+      file marks the template as an agent; ``is_agent: false`` marks it as a
+      document.  When absent the template defaults to *agent*.
+    - Section content is trimmed to ``_MAX_SECTION_CONTENT_LEN`` characters.
+    """
+    lines = md_text.splitlines()
+
+    name = "Imported Template"
+    is_agent = True
+    sections: dict[str, str] = {}
+    current_key: str | None = None
+    current_lines: list[str] = []
+
+    for line in lines:
+        # Detect is_agent metadata (flexible placement)
+        low = line.strip().lower()
+        if low == "is_agent: true":
+            is_agent = True
+            continue
+        if low == "is_agent: false":
+            is_agent = False
+            continue
+
+        # H1 → template name (first occurrence only)
+        if line.startswith("# ") and name == "Imported Template":
+            name = line[2:].strip() or name
+            continue
+
+        # H2 → new section
+        if line.startswith("## "):
+            # Flush the previous section
+            if current_key is not None:
+                sections[current_key] = "\n".join(current_lines).strip()[
+                    :_MAX_SECTION_CONTENT_LEN
+                ]
+            current_key = _to_section_key(line[3:])
+            current_lines = []
+            continue
+
+        # Body line — collect into current section
+        if current_key is not None:
+            current_lines.append(line)
+
+    # Flush the last section
+    if current_key is not None:
+        sections[current_key] = "\n".join(current_lines).strip()[
+            :_MAX_SECTION_CONTENT_LEN
+        ]
+
+    return {"name": name, "is_agent": is_agent, "sections": sections}
+
+
+# ── JSON Library Import ────────────────────────────────────────────────────────
+
+try:
+    from django.core.management.base import BaseCommand
+    from your_app.models import BMADTemplate  # type: ignore[import]
+
+    class Command(BaseCommand):
+        help = "Imports a library of BMAD v6 templates from a JSON or Markdown file"
+
+        def add_arguments(self, parser):
+            parser.add_argument(
+                "file_path",
+                type=str,
+                help="Path to a library.json file or a single .md template file",
             )
-            status = "Created" if created else "Updated"
-            self.stdout.write(self.style.SUCCESS(f"{status} template: {template.name}"))
+
+        def handle(self, *args, **options):
+            path = options["file_path"]
+            if not os.path.exists(path):
+                self.stderr.write(f"File not found: {path}")
+                return
+
+            if path.lower().endswith(".md"):
+                with open(path, "r", encoding="utf-8") as f:
+                    md_text = f.read()
+                items = [parse_md_to_template(md_text)]
+            else:
+                with open(path, "r", encoding="utf-8") as f:
+                    items = json.load(f)
+
+            for item in items:
+                template, created = BMADTemplate.objects.update_or_create(
+                    name=item["name"],
+                    defaults={
+                        "sections": item["sections"],
+                        "is_agent": item.get("is_agent", True),
+                    },
+                )
+                status = "Created" if created else "Updated"
+                self.stdout.write(self.style.SUCCESS(f"{status}: {template.name}"))
+
+except ImportError:
+    # Django is not installed; the parse_md_to_template helper is still available
+    # for use by the Flask application directly.
+    pass

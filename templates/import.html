@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ config.icon }} Import Template — {{ config.application_title }}{% endblock %}
+{% block content %}
+<h1>{{ config.icon }} Import Template or Agent</h1>
+<p class="subtitle">
+  Upload a Markdown (<code>.md</code>) file to add a new template or agent to the library.
+  The file will be parsed automatically — the first <code># Heading</code> becomes the template
+  name and each <code>## Heading</code> becomes a section.
+</p>
+
+<hr>
+
+<h2>Markdown Format</h2>
+<p>Structure your <code>.md</code> file like this:</p>
+<pre class="code-block">
+# My Agent Name
+is_agent: true
+
+## Persona
+Describe the agent persona here.
+
+## Workflow
+List the steps the agent should follow.
+
+## Constraints
+Any hard limits or rules for the agent.
+</pre>
+<p>Use <code>is_agent: false</code> for document templates (e.g. Project Brief, ADR).</p>
+
+<hr>
+
+<form method="post" action="{{ url_for('import_template') }}" enctype="multipart/form-data" novalidate>
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+
+  <div class="section-guide">
+    <label for="md_file"><strong>Select Markdown file</strong></label>
+    <br><br>
+    <input
+      type="file"
+      id="md_file"
+      name="md_file"
+      accept=".md,text/markdown,text/plain"
+      required
+      class="file-input"
+    >
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn-primary">📥 Import Template</button>
+    <a href="{{ url_for('index') }}" class="btn-secondary">← Cancel</a>
+  </div>
+</form>
+{% endblock %}
