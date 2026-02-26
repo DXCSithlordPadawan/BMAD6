@@ -1,9 +1,9 @@
 # config.yaml
 app_settings:
-  application_title: "BMAD v6 Architect"
+  application_title: "BMAD Forge V6"
   web_port: 8000
   base_location: "./bmad_output/"
-  icon: "🧱"
+  icon: "👩‍💻"
   sharding_enabled: true
   # HTTPS is controlled via environment variables (see .env.example):
   #   HTTPS_ENABLED=1, SSL_CERT_FILE=<path>, SSL_KEY_FILE=<path>
@@ -20,3 +20,6 @@ app_settings:
     - QA
     - Testing
     - Integration
+    - Agents
+    - Documents
+    
