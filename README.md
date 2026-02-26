@@ -14,7 +14,7 @@ git clone https://github.com/DXCSithlordPadawan/BMAD6.git
 cd BMAD6
 
 # 2. Virtual environment
-python -m venv venv
+python3.13 -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 
 # 3. Install dependencies
@@ -25,11 +25,11 @@ cp .env.example .env
 # Set SECRET_KEY to a random 64-char hex string in .env
 
 # 5. Change the default admin password
-python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('your_secure_password'))"
+python3.13 -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('your_secure_password'))"
 # Paste the hash into config/users.yaml
 
 # 6. Start
-python app.py
+python3.13 app.py
 ```
 
 Open **http://localhost:8000** and sign in with your credentials.
@@ -131,3 +131,4 @@ BMAD6/
 | [`docs/maintenance.md`](docs/maintenance.md) | Maintenance procedures |
 | [`docs/deployment.md`](docs/deployment.md) | Deployment guide |
 | [`docs/container_build.md`](docs/container_build.md) | Podman container build guide |
+
