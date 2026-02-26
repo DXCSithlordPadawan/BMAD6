@@ -4,11 +4,19 @@
 # Generate a password hash with:
 #   python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('your_password'))"
 #
-# Roles: admin, user, security_lead, devops
-#   admin         — Full application access including amend/edit
-#   user          — Standard access: guide, generate, download, dashboard
-#   security_lead — Dashboard and audit log access only
-#   devops        — No application routes; infrastructure access only
+# Roles: admin, super_user, user
+#   admin      — Full access: all routes plus user management (suspend/delete users)
+#   super_user — Guide, generate, view dashboard, download ZIP & Markdown, delete generated docs
+#   user       — Guide, generate, view dashboard, download Consolidated Markdown only
+#
+# User fields:
+#   username        — Unique login name
+#   password_hash   — Werkzeug password hash (scrypt/argon2/pbkdf2)
+#   role            — One of: admin, super_user, user
+#   full_name       — User's full name
+#   email           — Contact email address (must be unique)
+#   contact_number  — Phone/contact number
+#   suspended       — true to prevent login; false (default) for active accounts
 #
 # WARNING: At minimum, change the admin password before first use.
 #          You may also add, remove, or modify user entries as needed.
@@ -21,3 +29,7 @@ users:
     #   python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('your_strong_password'))"
     password_hash: "scrypt:32768:8:1$Jw0WZymR8khDXN6f$1fcc3c5c2560b82a7008c69ebf3c400f16bbdf01ef745dcdc19abd41450c065559fe4729d9a1920a964aa193397121338a454e333a9a47b5721d3394fd8a0cb1"
     role: admin
+    full_name: "Administrator"
+    email: "admin@example.com"
+    contact_number: "+000000000"
+    suspended: false

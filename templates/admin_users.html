@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}{{ config.icon }} User Management — {{ config.application_title }}{% endblock %}
+{% block content %}
+<h1>{{ config.icon }} User Management</h1>
+<p class="subtitle">Manage registered user accounts below.</p>
+<hr>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<table class="agent-table">
+  <thead>
+    <tr>
+      <th>Username</th>
+      <th>Full Name</th>
+      <th>Email</th>
+      <th>Contact</th>
+      <th>Role</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for username, user in users.items() %}
+    <tr>
+      <td><strong>{{ username }}</strong></td>
+      <td>{{ user.full_name or '—' }}</td>
+      <td>{{ user.email or '—' }}</td>
+      <td>{{ user.contact_number or '—' }}</td>
+      <td><em>{{ user.role }}</em></td>
+      <td>
+        {% if user.suspended %}
+          <span class="status-suspended">🔒 Suspended</span>
+        {% else %}
+          <span class="status-ready">✅ Active</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if username != current_user.username %}
+        <form method="post" action="{{ url_for('suspend_user', username=username) }}" style="display:inline;">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+          {% if user.suspended %}
+          <button type="submit" class="btn-secondary btn-sm">🔓 Unsuspend</button>
+          {% else %}
+          <button type="submit" class="btn-secondary btn-sm">🔒 Suspend</button>
+          {% endif %}
+        </form>
+        <form method="post" action="{{ url_for('delete_user', username=username) }}" style="display:inline;"
+              onsubmit="return confirm('Permanently delete user \'{{ username }}\'?');">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-danger btn-sm">🗑 Delete</button>
+        </form>
+        {% else %}
+        <em class="muted">(current user)</em>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="7">No users found.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

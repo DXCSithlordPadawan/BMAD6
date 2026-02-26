@@ -44,10 +44,11 @@ The application uses **username/password authentication** (Flask-Login) with **r
 
 | Role | Access |
 |---|---|
-| `admin` | Full access — all routes |
-| `user` | Guide, generate, download, dashboard, amend |
-| `security_lead` | Dashboard and template list |
-| `devops` | Template list only (infrastructure role) |
+| `admin` | Full access — all routes, plus user management (suspend/delete users) |
+| `super_user` | Guide, generate, view dashboard, download ZIP & Markdown, delete generated docs |
+| `user` | Guide, generate, view dashboard, download Consolidated Markdown only |
+
+New users may **self-register** at `/register`. All registered accounts default to the `user` role. An administrator can promote users by editing `config/users.yaml`.
 
 User accounts are managed in `config/users.yaml`. See [`docs/rbac.md`](docs/rbac.md) for details.
 

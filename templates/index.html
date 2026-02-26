@@ -39,7 +39,9 @@
     </div>
     <div class="card-actions">
       <a href="{{ url_for('guide', template_id=t.id) }}" class="btn-primary">▶ Start Guide</a>
+      {% if current_user.is_authenticated and current_user.role == 'admin' %}
       <a href="{{ url_for('amend_template', template_id=t.id) }}" class="btn-secondary">✏ Edit Defaults</a>
+      {% endif %}
     </div>
   </div>
   {% else %}
@@ -48,7 +50,7 @@
 </div>
 <p id="no-match-msg" style="display:none;">No templates match the selected group.</p>
 
-{% if current_user.is_authenticated %}
+{% if current_user.is_authenticated and current_user.role == 'admin' %}
 <br>
 <a href="{{ url_for('import_template') }}" class="btn-secondary">📥 Import Template / Agent</a>
 {% endif %}

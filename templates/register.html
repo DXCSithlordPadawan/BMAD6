@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Register — {{ config.application_title }}{% endblock %}
+{% block content %}
+<h1>{{ config.icon }} Create an Account</h1>
+<p class="subtitle">Register to access {{ config.application_title }}. All fields are required.</p>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="login-card">
+  <form method="post" action="{{ url_for('register') }}" autocomplete="on">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+
+    <div class="form-group">
+      <label for="full_name">Full Name</label>
+      <input
+        type="text"
+        id="full_name"
+        name="full_name"
+        class="form-control"
+        required
+        autocomplete="name"
+        maxlength="150"
+        value="{{ form.get('full_name', '') | e }}"
+      >
+    </div>
+
+    <div class="form-group">
+      <label for="email">Email Address</label>
+      <input
+        type="email"
+        id="email"
+        name="email"
+        class="form-control"
+        required
+        autocomplete="email"
+        maxlength="255"
+        value="{{ form.get('email', '') | e }}"
+      >
+    </div>
+
+    <div class="form-group">
+      <label for="username">Login Name (Username)</label>
+      <input
+        type="text"
+        id="username"
+        name="username"
+        class="form-control"
+        required
+        autocomplete="username"
+        maxlength="50"
+        pattern="^[A-Za-z0-9_][A-Za-z0-9._\-]{2,49}$"
+        title="3–50 characters: letters, digits, dots, hyphens, underscores"
+        value="{{ form.get('username', '') | e }}"
+      >
+    </div>
+
+    <div class="form-group">
+      <label for="contact_number">Contact Number</label>
+      <input
+        type="tel"
+        id="contact_number"
+        name="contact_number"
+        class="form-control"
+        required
+        autocomplete="tel"
+        maxlength="30"
+        value="{{ form.get('contact_number', '') | e }}"
+      >
+    </div>
+
+    <div class="form-group">
+      <label for="password">Password <small>(minimum 8 characters)</small></label>
+      <input
+        type="password"
+        id="password"
+        name="password"
+        class="form-control"
+        required
+        autocomplete="new-password"
+        minlength="8"
+      >
+    </div>
+
+    <div class="form-group">
+      <label for="confirm_password">Confirm Password</label>
+      <input
+        type="password"
+        id="confirm_password"
+        name="confirm_password"
+        class="form-control"
+        required
+        autocomplete="new-password"
+        minlength="8"
+      >
+    </div>
+
+    <button type="submit" class="btn-primary">📝 Register</button>
+  </form>
+  <p class="register-link">Already have an account? <a href="{{ url_for('login') }}">Sign in here</a>.</p>
+</div>
+{% endblock %}
