@@ -31,7 +31,9 @@ New users may self-register at `/register`. All self-registered accounts default
 | Use guided interview (`GET/POST /guide/<id>`) | ❌ | ✅ | ✅ | ✅ |
 | View success page (`GET /success/<name>`) | ❌ | ✅ | ✅ | ✅ |
 | View dashboard (`GET /dashboard`) | ❌ | ✅ | ✅ | ✅ |
+| View consolidated Markdown file (`GET /view_file/<name>/<name>_complete.md`) | ❌ | ✅ | ✅ | ✅ |
 | Download Consolidated Markdown (`GET /download_md/<name>`) | ❌ | ✅ | ✅ | ✅ |
+| View intermediate shard files (`GET /view_file/<name>/<shard>.md`) | ❌ | ❌ | ❌ | ✅ |
 | **Change own password (`GET/POST /change_password`)** | ❌ | ✅ | ✅ | ✅ |
 | Download ZIP (`GET /download/<name>`) | ❌ | ❌ | ✅ | ✅ |
 | Delete generated document (`POST /delete/<name>`) | ❌ | ❌ | ✅ | ✅ |
