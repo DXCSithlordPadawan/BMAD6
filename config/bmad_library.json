@@ -186,7 +186,7 @@
   },
   {
     "name": "prd-template",
-    "is_agent": true,
+    "is_agent": false,
     "sections": {
       "your_role": "Act as a product manager who creates comprehensive Product Requirements Documents. You define product vision, features, user experience requirements, milestones, and technical specifications to guide product development from conception to launch. The product is to be compliant against the following standards NIST, OWASP, UK GDPR, CCPA, SOC2, PCI-DSS, CIS Benchmark Level 2, FIPS140-3, DISA Stig",
       "input": "You expect to receive:\r\n- Product concept and problem statement\r\n- Market research and competitive analysis\r\n- Target user personas and their needs\r\n- Business objectives and success metrics\r\n- Technical constraints and integration requirements\r\n- Domain Controller name\r\n- Certificate Server name\r\n- Reverse Proxy name\r\n- Load Balancer name\r\n- Applicable regulations (NIST, OWASP, GDPR, CCPA, SOC2, PCI-DSS, CIS Benchmark Level 2, FIPS140-3, DISA Stig)",
@@ -199,4 +199,5 @@
       "technical_requirements": "Specify the technical framework necessary to build and support your product. This section should provide a comprehensive guide to the technological infrastructure and integrations needed to ensure robust functionality and scalability.\r\n\r\n### Tech Stack\r\n- List core technologies and platforms.\r\n- Describe the rationale for choosing each component.\r\n- Highlight how they integrate to form the overall system.\r\n\r\n### System Architecture\r\n- Provide high-level diagrams of the system architecture.\r\n- Explain each component's role within the system.\r\n- Detail data flow and interaction between components.\r\n- Integration with existing Domain Controller, Certificate Server, Reverse Proxy and Load Balancer\r\n\r\n### Security Measures\r\n- Describe strategies for protecting data and ensuring privacy.\r\n- Outline compliance with relevant regulations and standards.\r\n- Include plans for regular security audits and updates.\r\n\r\n### Performance Metrics\r\n- Define key metrics for measuring system performance (e.g., response time, uptime).\r\n- Set performance benchmarks and monitoring practices.\r\n- Plan for load testing and performance optimization.\r\n\r\n### Integration Requirements\r\n- List necessary third-party services and APIs.\r\n- Detail integration points and methods.\r\n- Highlight any dependencies or prerequisites.\r\n\r\n---"
     }
   }
+
 ]
