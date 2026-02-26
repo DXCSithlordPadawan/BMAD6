@@ -20,11 +20,14 @@
       <td><span class="status-ready">✅ Ready</span></td>
       <td>
         <a href="{{ url_for('success', agent_name=agent) }}" class="btn-secondary btn-sm">View</a>
+        <a href="{{ url_for('download_md', agent_name=agent) }}" class="btn-secondary btn-sm">📄 Download MD</a>
+        {% if current_user.role in ('admin', 'super_user') %}
         <a href="{{ url_for('download_zip', agent_name=agent) }}" class="btn-download">⬇ Download ZIP</a>
         <form method="post" action="{{ url_for('delete_agent', agent_name=agent) }}" style="display:inline;">
           <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
           <button type="submit" class="btn-danger btn-sm">🗑 Delete</button>
         </form>
+        {% endif %}
       </td>
     </tr>
     {% else %}

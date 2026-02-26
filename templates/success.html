@@ -17,9 +17,11 @@
   </ul>
 
   <div class="form-actions">
+    {% if current_user.role in ('admin', 'super_user') %}
     <a href="{{ url_for('download_zip', agent_name=agent_name) }}" class="btn-primary">
       ⬇ Download ZIP
     </a>
+    {% endif %}
     <a href="{{ url_for('download_md', agent_name=agent_name) }}" class="btn-primary">
       📄 Download Markdown
     </a>

@@ -44,7 +44,7 @@ from flask_login import (
     logout_user,
 )
 from markupsafe import escape
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 # ── Bootstrap ─────────────────────────────────────────────────────────────────
 load_dotenv()
@@ -115,10 +115,19 @@ def get_output_dir() -> Path:
 
 #: Valid application roles and which routes they may access.
 ROLE_PERMISSIONS: dict[str, set[str]] = {
-    "admin": {"index", "guide", "dashboard", "success", "download_zip", "download_md", "amend_template", "delete_agent", "import_template"},
-    "user": {"index", "guide", "dashboard", "success", "download_zip", "download_md", "amend_template", "delete_agent", "import_template"},
-    "security_lead": {"index", "dashboard"},
-    "devops": {"index"},
+    "admin": {
+        "index", "guide", "dashboard", "success",
+        "download_zip", "download_md",
+        "amend_template", "delete_agent", "import_template",
+        "admin_users", "suspend_user", "delete_user",
+    },
+    "super_user": {
+        "index", "guide", "dashboard", "success",
+        "download_zip", "download_md", "delete_agent",
+    },
+    "user": {
+        "index", "guide", "dashboard", "success", "download_md",
+    },
 }
 
 login_manager = LoginManager()
@@ -131,11 +140,29 @@ login_manager.init_app(app)
 class User(UserMixin):
     """In-memory user object loaded from config/users.yaml."""
 
-    def __init__(self, username: str, password_hash: str, role: str) -> None:
+    def __init__(
+        self,
+        username: str,
+        password_hash: str,
+        role: str,
+        full_name: str = "",
+        email: str = "",
+        contact_number: str = "",
+        suspended: bool = False,
+    ) -> None:
         self.id = username  # Flask-Login uses .id for session storage
         self.username = username
         self.password_hash = password_hash
         self.role = role
+        self.full_name = full_name
+        self.email = email
+        self.contact_number = contact_number
+        self.suspended = suspended
+
+    @property
+    def is_active(self) -> bool:  # type: ignore[override]
+        """Flask-Login calls this; suspended users are treated as inactive."""
+        return not self.suspended
 
 
 def load_users() -> dict[str, User]:
@@ -153,8 +180,41 @@ def load_users() -> dict[str, User]:
                 username=uname,
                 password_hash=entry.get("password_hash", ""),
                 role=entry.get("role", "user"),
+                full_name=entry.get("full_name", ""),
+                email=entry.get("email", ""),
+                contact_number=entry.get("contact_number", ""),
+                suspended=bool(entry.get("suspended", False)),
             )
     return users
+
+
+def save_users(users: dict[str, "User"]) -> None:
+    """Persist the current users dict back to config/users.yaml."""
+    records = [
+        {
+            "username": u.username,
+            "password_hash": u.password_hash,
+            "role": u.role,
+            "full_name": u.full_name,
+            "email": u.email,
+            "contact_number": u.contact_number,
+            "suspended": u.suspended,
+        }
+        for u in users.values()
+    ]
+    # Preserve the existing header comment by reading the raw file first.
+    header_lines: list[str] = []
+    if USERS_PATH.exists():
+        with open(USERS_PATH, "r", encoding="utf-8") as fh:
+            for line in fh:
+                if line.startswith("#"):
+                    header_lines.append(line)
+                else:
+                    break
+    with open(USERS_PATH, "w", encoding="utf-8") as fh:
+        for line in header_lines:
+            fh.write(line)
+        yaml.dump({"users": records}, fh, default_flow_style=False, allow_unicode=True)
 
 
 @login_manager.user_loader
@@ -220,6 +280,11 @@ _MAX_NAME_LEN = 100
 _MAX_SECTION_LEN = 8192
 _MAX_MD_UPLOAD_BYTES = 512_000  # 500 KB — reasonable upper bound for a template
 _SAFE_NAME_RE = re.compile(r"[^\w\s\-]")  # allow word chars, spaces, hyphens
+
+# Registration field constraints
+_EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,255}\.[^@\s.]{2,}$")
+_CONTACT_RE = re.compile(r"^[\d\s\-\+\(\)]{7,30}$")
+_MIN_PASSWORD_LEN = 8
 
 
 def sanitise_name(value: str) -> str:
@@ -379,6 +444,10 @@ def login():
         users = load_users()
         user = users.get(username)
         if user and check_password_hash(user.password_hash, password):
+            if user.suspended:
+                logger.warning("Suspended user '%s' attempted to log in.", username)
+                flash("Your account has been suspended. Please contact an administrator.", "danger")
+                return render_template("login.html", config=config)
             login_user(user)
             logger.info("User '%s' (role=%s) logged in.", username, user.role)
             next_page = request.args.get("next")
@@ -403,6 +472,89 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    """Self-service registration page; new accounts default to the 'user' role."""
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+
+    config = load_config()
+    if request.method == "POST":
+        if not _validate_csrf(request.form.get("_csrf")):
+            logger.warning("CSRF validation failed on /register")
+            abort(403)
+
+        full_name = request.form.get("full_name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        username = request.form.get("username", "").strip()
+        contact_number = request.form.get("contact_number", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        errors: list[str] = []
+
+        # --- field presence ---
+        if not full_name:
+            errors.append("Full name is required.")
+        if not email:
+            errors.append("Email address is required.")
+        elif not _EMAIL_RE.match(email):
+            errors.append("Please enter a valid email address.")
+        if not username:
+            errors.append("Login name (username) is required.")
+        elif not re.match(r"^[A-Za-z0-9_][A-Za-z0-9._\-]{2,49}$", username):
+            errors.append("Username must be 3–50 characters and contain only letters, digits, dots, hyphens, and underscores.")
+        if not contact_number:
+            errors.append("Contact number is required.")
+        elif not _CONTACT_RE.match(contact_number):
+            errors.append("Contact number must be 7–30 characters and contain only digits, spaces, +, -, (, ).")
+        if not password:
+            errors.append("Password is required.")
+        elif len(password) < _MIN_PASSWORD_LEN:
+            errors.append(f"Password must be at least {_MIN_PASSWORD_LEN} characters.")
+        if password and confirm_password != password:
+            errors.append("Passwords do not match.")
+
+        if not errors:
+            users = load_users()
+            if username in users:
+                errors.append("That username is already taken.")
+            elif any(u.email.lower() == email for u in users.values()):
+                errors.append("An account with that email address already exists.")
+
+        if errors:
+            for err in errors:
+                flash(err, "danger")
+            return render_template(
+                "register.html",
+                config=config,
+                form={
+                    "full_name": full_name,
+                    "email": email,
+                    "username": username,
+                    "contact_number": contact_number,
+                },
+            )
+
+        new_user = User(
+            username=username,
+            password_hash=generate_password_hash(password),
+            role="user",
+            full_name=full_name,
+            email=email,
+            contact_number=contact_number,
+            suspended=False,
+        )
+        users = load_users()
+        users[username] = new_user
+        save_users(users)
+        logger.info("New user '%s' registered (role=user).", username)
+        flash("Account created successfully. Please sign in.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("register.html", config=config, form={})
+
+
 @app.route("/")
 def index():
     """List all available BMAD templates (agents and documents)."""
@@ -414,7 +566,7 @@ def index():
 
 @app.route("/guide/<int:template_id>", methods=["GET", "POST"])
 @login_required
-@role_required("admin", "user")
+@role_required("admin", "super_user", "user")
 def guide(template_id: int):
     """Step-by-step guided interview to populate a BMAD v6 template."""
     config = load_config()
@@ -502,7 +654,7 @@ def guide(template_id: int):
 
 @app.route("/dashboard")
 @login_required
-@role_required("admin", "user", "security_lead")
+@role_required("admin", "super_user", "user")
 def dashboard():
     """Show all previously generated BMAD agents and documents."""
     config = load_config()
@@ -519,7 +671,7 @@ def dashboard():
 
 @app.route("/success/<agent_name>")
 @login_required
-@role_required("admin", "user")
+@role_required("admin", "super_user", "user")
 def success(agent_name: str):
     """Confirmation page displayed after successful generation."""
     safe_name = sanitise_name(agent_name)
@@ -538,7 +690,7 @@ def success(agent_name: str):
 
 @app.route("/download/<agent_name>")
 @login_required
-@role_required("admin", "user")
+@role_required("admin", "super_user")
 def download_zip(agent_name: str):
     """Stream a ZIP archive of all sharded files for a given agent."""
     safe_name = sanitise_name(agent_name)
@@ -571,7 +723,7 @@ def download_zip(agent_name: str):
 
 @app.route("/download_md/<agent_name>")
 @login_required
-@role_required("admin", "user")
+@role_required("admin", "super_user", "user")
 def download_md(agent_name: str):
     """Stream the consolidated (amalgamated) Markdown document for a given agent."""
     safe_name = sanitise_name(agent_name)
@@ -602,7 +754,7 @@ def download_md(agent_name: str):
 
 @app.route("/delete/<agent_name>", methods=["POST"])
 @login_required
-@role_required("admin", "user")
+@role_required("admin", "super_user")
 def delete_agent(agent_name: str):
     """Delete a generated agent/document directory from the output folder."""
     if not _validate_csrf(request.form.get("_csrf")):
@@ -630,7 +782,7 @@ def delete_agent(agent_name: str):
 
 @app.route("/amend/<int:template_id>", methods=["GET", "POST"])
 @login_required
-@role_required("admin", "user")
+@role_required("admin")
 def amend_template(template_id: int):
     """Update the default content for a template's sections and groups."""
     config = load_config()
@@ -679,7 +831,7 @@ def amend_template(template_id: int):
 
 @app.route("/import", methods=["GET", "POST"])
 @login_required
-@role_required("admin", "user")
+@role_required("admin")
 def import_template():
     """Import a BMAD v6 template or agent from an uploaded Markdown (.md) file.
 
@@ -780,6 +932,68 @@ def import_template():
     return render_template("import.html", config=config, all_groups=all_groups)
 
 
+# ── Admin — User Management ────────────────────────────────────────────────────
+
+
+@app.route("/admin/users")
+@login_required
+@role_required("admin")
+def admin_users():
+    """Admin page listing all registered users with options to suspend or delete."""
+    config = load_config()
+    users = load_users()
+    return render_template("admin_users.html", users=users, config=config)
+
+
+@app.route("/admin/users/<username>/suspend", methods=["POST"])
+@login_required
+@role_required("admin")
+def suspend_user(username: str):
+    """Toggle the suspended status of a user account."""
+    if not _validate_csrf(request.form.get("_csrf")):
+        logger.warning("CSRF validation failed for suspend_user '%s'", username)
+        abort(403)
+
+    if username == current_user.username:
+        flash("You cannot suspend your own account.", "warning")
+        return redirect(url_for("admin_users"))
+
+    users = load_users()
+    if username not in users:
+        abort(404)
+
+    users[username].suspended = not users[username].suspended
+    action = "suspended" if users[username].suspended else "unsuspended"
+    save_users(users)
+    logger.info("Admin '%s' %s user '%s'.", current_user.username, action, username)
+    flash(f"User '{escape(username)}' has been {action}.", "success")
+    return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/<username>/delete", methods=["POST"])
+@login_required
+@role_required("admin")
+def delete_user(username: str):
+    """Permanently delete a user account."""
+    if not _validate_csrf(request.form.get("_csrf")):
+        logger.warning("CSRF validation failed for delete_user '%s'", username)
+        abort(403)
+
+    if username == current_user.username:
+        flash("You cannot delete your own account.", "warning")
+        return redirect(url_for("admin_users"))
+
+    users = load_users()
+    if username not in users:
+        abort(404)
+
+    del users[username]
+    save_users(users)
+    logger.info("Admin '%s' deleted user '%s'.", current_user.username, username)
+    flash(f"User '{escape(username)}' has been deleted.", "success")
+    return redirect(url_for("admin_users"))
+
+
 # ── Error Handlers ─────────────────────────────────────────────────────────────
 
 
@@ -813,10 +1027,9 @@ if __name__ == "__main__":
     _debug = os.environ.get("FLASK_DEBUG", "0") == "1"
 
     # Warn if the default admin password ('changeme') is still in use.
-    from werkzeug.security import check_password_hash as _chk
     _startup_users = load_users()
     for _u in _startup_users.values():
-        if _chk(_u.password_hash, "changeme"):
+        if check_password_hash(_u.password_hash, "changeme"):
             logger.warning(
                 "SECURITY WARNING: User '%s' is using the default password 'changeme'. "
                 "Change it in config/users.yaml before deploying.",
