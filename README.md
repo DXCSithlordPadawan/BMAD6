@@ -1,4 +1,4 @@
-# 🧱 BMAD v6 Template Architect
+# 👩‍💻 BMAD v6 Template Architect
 
 A Python Flask web application that guides users through a structured,
 step-by-step interview process to produce **BMAD v6-compliant sharded Markdown
@@ -131,4 +131,5 @@ BMAD6/
 | [`docs/maintenance.md`](docs/maintenance.md) | Maintenance procedures |
 | [`docs/deployment.md`](docs/deployment.md) | Deployment guide |
 | [`docs/container_build.md`](docs/container_build.md) | Podman container build guide |
+
 
