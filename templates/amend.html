@@ -10,6 +10,22 @@
 <form method="post" action="{{ url_for('amend_template', template_id=template_id) }}" novalidate>
   <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
 
+  {% if all_groups %}
+  <div class="section-guide">
+    <h3>Groups</h3>
+    <p class="subtitle">Assign one or more functional groups to this template.</p>
+    <div class="checkbox-grid">
+      {% for g in all_groups %}
+      <label class="checkbox-label">
+        <input type="checkbox" name="groups" value="{{ g }}"
+          {% if g in template.groups %}checked{% endif %}>
+        {{ g }}
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   {% for key, default_value in template.sections.items() %}
   <div class="section-guide">
     <h3>{{ key.replace('_', ' ').title() }}</h3>

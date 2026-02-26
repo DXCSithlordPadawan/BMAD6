@@ -87,8 +87,11 @@ def load_library() -> list:
     with open(LIBRARY_PATH, "r", encoding="utf-8") as fh:
         data = json.load(fh)
     # Inject a stable integer id so templates can be referenced by index.
+    # Ensure every entry has a 'groups' list (backwards compatibility).
     for idx, entry in enumerate(data):
         entry["id"] = idx
+        if "groups" not in entry:
+            entry["groups"] = []
     return data
 
 
@@ -112,8 +115,8 @@ def get_output_dir() -> Path:
 
 #: Valid application roles and which routes they may access.
 ROLE_PERMISSIONS: dict[str, set[str]] = {
-    "admin": {"index", "guide", "dashboard", "success", "download_zip", "amend_template", "delete_agent", "import_template"},
-    "user": {"index", "guide", "dashboard", "success", "download_zip", "amend_template", "delete_agent", "import_template"},
+    "admin": {"index", "guide", "dashboard", "success", "download_zip", "download_md", "amend_template", "delete_agent", "import_template"},
+    "user": {"index", "guide", "dashboard", "success", "download_zip", "download_md", "amend_template", "delete_agent", "import_template"},
     "security_lead": {"index", "dashboard"},
     "devops": {"index"},
 }
@@ -253,6 +256,9 @@ def parse_md_to_template(md_text: str) -> dict:
         ---
         name: Template Name
         is_agent: true
+        groups:
+          - Planning
+          - Development
         ---
 
         # Template Name
@@ -265,8 +271,8 @@ def parse_md_to_template(md_text: str) -> dict:
         Content for section two.
 
     Rules:
-    - YAML frontmatter (``---`` delimited block) is parsed first; ``name``
-      and ``is_agent`` values there take precedence unless overridden later.
+    - YAML frontmatter (``---`` delimited block) is parsed first; ``name``,
+      ``is_agent``, and ``groups`` values there take precedence.
     - The first ``# `` heading becomes the template name if not set via
       frontmatter.
     - Every ``## `` heading opens a new section; its key is the heading text
@@ -280,6 +286,7 @@ def parse_md_to_template(md_text: str) -> dict:
 
     name = "Imported Template"
     is_agent = True
+    groups: list[str] = []
     sections: dict[str, str] = {}
     current_key: str | None = None
     current_lines: list[str] = []
@@ -296,6 +303,8 @@ def parse_md_to_template(md_text: str) -> dict:
                         name = str(fm["name"])
                     if "is_agent" in fm:
                         is_agent = bool(fm["is_agent"])
+                    if "groups" in fm and isinstance(fm["groups"], list):
+                        groups = [str(g) for g in fm["groups"]]
             except yaml.YAMLError:
                 pass
             start = end + 1
@@ -328,7 +337,7 @@ def parse_md_to_template(md_text: str) -> dict:
     if current_key is not None:
         sections[current_key] = "\n".join(current_lines).strip()[:_MAX_SECTION_LEN]
 
-    return {"name": name, "is_agent": is_agent, "sections": sections}
+    return {"name": name, "is_agent": is_agent, "groups": groups, "sections": sections}
 
 
 # ── Security Response Headers ──────────────────────────────────────────────────
@@ -342,7 +351,7 @@ def apply_security_headers(response):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "style-src 'self' 'unsafe-inline'; "
-        "script-src 'none';"
+        "script-src 'self';"
     )
     # Remove server fingerprinting header added by Werkzeug/Flask.
     response.headers.pop("Server", None)
@@ -399,7 +408,8 @@ def index():
     """List all available BMAD templates (agents and documents)."""
     config = load_config()
     templates = load_library()
-    return render_template("index.html", templates=templates, config=config)
+    groups = config.get("groups", [])
+    return render_template("index.html", templates=templates, config=config, groups=groups)
 
 
 @app.route("/guide/<int:template_id>", methods=["GET", "POST"])
@@ -559,6 +569,37 @@ def download_zip(agent_name: str):
     )
 
 
+@app.route("/download_md/<agent_name>")
+@login_required
+@role_required("admin", "user")
+def download_md(agent_name: str):
+    """Stream the consolidated (amalgamated) Markdown document for a given agent."""
+    safe_name = sanitise_name(agent_name)
+    output_root = get_output_dir()
+    agent_dir = (output_root / safe_name).resolve()
+
+    # Path-traversal guard: the resolved agent dir must be a child of output_root.
+    try:
+        agent_dir.relative_to(output_root.resolve())
+    except ValueError:
+        abort(403)
+
+    if not agent_dir.exists() or not agent_dir.is_dir():
+        abort(404)
+
+    md_file = agent_dir / f"{safe_name}_complete.md"
+    if not md_file.exists():
+        abort(404)
+
+    logger.info("Serving Markdown download for agent '%s'", safe_name)
+    return send_file(
+        md_file,
+        mimetype="text/markdown",
+        as_attachment=True,
+        download_name=f"{safe_name}_complete.md",
+    )
+
+
 @app.route("/delete/<agent_name>", methods=["POST"])
 @login_required
 @role_required("admin", "user")
@@ -591,9 +632,10 @@ def delete_agent(agent_name: str):
 @login_required
 @role_required("admin", "user")
 def amend_template(template_id: int):
-    """Update the default content for a template's sections."""
+    """Update the default content for a template's sections and groups."""
     config = load_config()
     templates = load_library()
+    all_groups = config.get("groups", [])
 
     if template_id < 0 or template_id >= len(templates):
         abort(404)
@@ -611,11 +653,16 @@ def amend_template(template_id: int):
             key: sanitise_content(request.form.get(key, ""))
             for key in template.get("sections", {})
         }
+        # Collect selected groups — only allow values from the configured list
+        submitted_groups = request.form.getlist("groups")
+        new_groups = [g for g in submitted_groups if g in all_groups]
+
         # Strip the injected id before persisting
         raw_templates = [
             {k: v for k, v in t.items() if k != "id"} for t in templates
         ]
         raw_templates[template_id]["sections"] = new_sections
+        raw_templates[template_id]["groups"] = new_groups
         with open(LIBRARY_PATH, "w", encoding="utf-8") as fh:
             json.dump(raw_templates, fh, indent=2, ensure_ascii=False)
         logger.info("Template '%s' amended and saved.", template.get("name"))
@@ -626,6 +673,7 @@ def amend_template(template_id: int):
         template=template,
         template_id=template_id,
         config=config,
+        all_groups=all_groups,
     )
 
 
@@ -639,11 +687,17 @@ def import_template():
     - The first ``# Heading`` becomes the template name.
     - Every ``## Heading`` opens a new section.
     - A line ``is_agent: true/false`` controls the template type.
+    - YAML frontmatter may include a ``groups`` list.
 
-    The resulting template is appended to ``config/bmad_library.json`` so it
+    Groups may also be selected via the import form; form selections take
+    precedence over frontmatter values.  If a template with the same name
+    already exists it is overwritten.
+
+    The resulting template is saved to ``config/bmad_library.json`` so it
     appears on the index page and can be run via the guided interview.
     """
     config = load_config()
+    all_groups = config.get("groups", [])
 
     if request.method == "POST":
         if not _validate_csrf(request.form.get("_csrf")):
@@ -653,12 +707,12 @@ def import_template():
         uploaded = request.files.get("md_file")
         if not uploaded or not uploaded.filename:
             flash("No file selected. Please choose a Markdown (.md) file.", "warning")
-            return render_template("import.html", config=config)
+            return render_template("import.html", config=config, all_groups=all_groups)
 
         filename = uploaded.filename
         if not filename.lower().endswith(".md"):
             flash("Only Markdown (.md) files are accepted.", "warning")
-            return render_template("import.html", config=config)
+            return render_template("import.html", config=config, all_groups=all_groups)
 
         # Check file size before reading to prevent memory exhaustion.
         uploaded.seek(0, os.SEEK_END)
@@ -666,7 +720,7 @@ def import_template():
         uploaded.seek(0)
         if file_size > _MAX_MD_UPLOAD_BYTES:
             flash("File is too large. Maximum size is 500 KB.", "warning")
-            return render_template("import.html", config=config)
+            return render_template("import.html", config=config, all_groups=all_groups)
 
         raw_bytes = uploaded.read()
 
@@ -674,7 +728,7 @@ def import_template():
             md_text = raw_bytes.decode("utf-8")
         except UnicodeDecodeError:
             flash("File could not be decoded as UTF-8 text.", "warning")
-            return render_template("import.html", config=config)
+            return render_template("import.html", config=config, all_groups=all_groups)
 
         new_entry = parse_md_to_template(md_text)
 
@@ -683,13 +737,20 @@ def import_template():
                 "No sections found. Ensure the file contains ## headings for each section.",
                 "warning",
             )
-            return render_template("import.html", config=config)
+            return render_template("import.html", config=config, all_groups=all_groups)
+
+        # Form-selected groups override frontmatter groups when any are submitted.
+        submitted_groups = request.form.getlist("groups")
+        if submitted_groups:
+            new_entry["groups"] = [g for g in submitted_groups if g in all_groups]
+        elif not new_entry.get("groups"):
+            new_entry["groups"] = []
 
         # Persist to the library, stripping injected ids first.
         templates = load_library()
         raw_templates = [{k: v for k, v in t.items() if k != "id"} for t in templates]
 
-        # Avoid duplicate names — update existing entry if name matches.
+        # Overwrite existing entry if name matches, otherwise append.
         existing_idx = next(
             (i for i, t in enumerate(raw_templates) if t["name"] == new_entry["name"]),
             None,
@@ -716,7 +777,7 @@ def import_template():
         )
         return redirect(url_for("index"))
 
-    return render_template("import.html", config=config)
+    return render_template("import.html", config=config, all_groups=all_groups)
 
 
 # ── Error Handlers ─────────────────────────────────────────────────────────────
