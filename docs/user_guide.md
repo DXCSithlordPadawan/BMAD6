@@ -85,21 +85,19 @@ Click **✅ Generate BMAD v6 Document** when all sections are complete.
 
 ### Step 3 — Download Your Output
 
-The success page shows a list of generated files:
+The success page shows the final consolidated document:
 
 ```
-agent.md                        ← master controller / table of contents
-step-00_<section>.md
-step-01_<section>.md
-…
 <agent_name>_complete.md        ← consolidated single-file document
 ```
+
+> **Note for Administrators:** The success page also displays all intermediate shard files (e.g. `agent.md`, `step-00_<section>.md`, etc.) that make up the complete document. These intermediate files are hidden from regular users and super users.
 
 Two download options are available:
 
 | Button | Description |
 |---|---|
-| **⬇ Download ZIP** | All sharded files as a single ZIP archive |
+| **⬇ Download ZIP** | All sharded files as a single ZIP archive (super_user/admin only) |
 | **📄 Download Markdown** | The consolidated `<agent_name>_complete.md` file — ready to paste into any AI model |
 
 ### Step 4 — Submit to an AI Model

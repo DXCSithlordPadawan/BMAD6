@@ -723,7 +723,13 @@ def success(agent_name: str):
     output_dir = get_output_dir() / safe_name
     files: list[str] = []
     if output_dir.exists():
-        files = sorted(f.name for f in output_dir.iterdir() if f.is_file())
+        all_files = sorted(f.name for f in output_dir.iterdir() if f.is_file())
+        if current_user.role == "admin":
+            files = all_files
+        else:
+            # Non-admin users only see the final consolidated document.
+            consolidated = f"{safe_name}_complete.md"
+            files = [f for f in all_files if f == consolidated]
     return render_template(
         "success.html",
         agent_name=escape(safe_name),
@@ -1120,6 +1126,12 @@ def view_md_file(agent_name: str, filename: str):
     safe_filename = Path(filename).name
     if not safe_filename.lower().endswith(".md"):
         abort(403)
+
+    # Non-admin users may only view the final consolidated document.
+    if current_user.role != "admin":
+        consolidated = f"{safe_name}_complete.md"
+        if safe_filename != consolidated:
+            abort(403)
 
     output_root = get_output_dir()
     agent_dir = (output_root / safe_name).resolve()
