@@ -10,7 +10,8 @@
   <h3>Generated Files</h3>
   <ul class="file-list">
     {% for f in files %}
-    <li>📄 <code>{{ f }}</code></li>
+    <li ondblclick="window.open('{{ url_for('view_md_file', agent_name=agent_name, filename=f) }}', '_blank')"
+        title="Double-click to view {{ f }} in a new tab" style="cursor:pointer;">📄 <code>{{ f }}</code></li>
     {% else %}
     <li>No files found.</li>
     {% endfor %}
