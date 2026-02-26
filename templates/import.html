@@ -6,6 +6,7 @@
   Upload a Markdown (<code>.md</code>) file to add a new template or agent to the library.
   The file will be parsed automatically — the first <code># Heading</code> becomes the template
   name and each <code>## Heading</code> becomes a section.
+  If a template with the same name already exists it will be overwritten.
 </p>
 
 <hr>
@@ -13,8 +14,15 @@
 <h2>Markdown Format</h2>
 <p>Structure your <code>.md</code> file like this:</p>
 <pre class="code-block">
-# My Agent Name
+---
+name: My Agent Name
 is_agent: true
+groups:
+  - Planning
+  - Development
+---
+
+# My Agent Name
 
 ## Persona
 Describe the agent persona here.
@@ -26,6 +34,7 @@ List the steps the agent should follow.
 Any hard limits or rules for the agent.
 </pre>
 <p>Use <code>is_agent: false</code> for document templates (e.g. Project Brief, ADR).</p>
+<p>Groups specified in the YAML frontmatter are used unless you select groups below (form selection takes precedence).</p>
 
 <hr>
 
@@ -44,6 +53,21 @@ Any hard limits or rules for the agent.
       class="file-input"
     >
   </div>
+
+  {% if all_groups %}
+  <div class="section-guide">
+    <h3>Groups <em class="subtitle">(optional — overrides frontmatter)</em></h3>
+    <p class="subtitle">Assign one or more functional groups to this template.</p>
+    <div class="checkbox-grid">
+      {% for g in all_groups %}
+      <label class="checkbox-label">
+        <input type="checkbox" name="groups" value="{{ g }}">
+        {{ g }}
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 
   <div class="form-actions">
     <button type="submit" class="btn-primary">📥 Import Template</button>

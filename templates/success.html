@@ -20,6 +20,9 @@
     <a href="{{ url_for('download_zip', agent_name=agent_name) }}" class="btn-primary">
       ⬇ Download ZIP
     </a>
+    <a href="{{ url_for('download_md', agent_name=agent_name) }}" class="btn-primary">
+      📄 Download Markdown
+    </a>
     <a href="{{ url_for('dashboard') }}" class="btn-secondary">📊 Go to Dashboard</a>
     <a href="{{ url_for('index') }}" class="btn-secondary">+ Create Another</a>
   </div>

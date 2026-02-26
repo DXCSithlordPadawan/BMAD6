@@ -7,3 +7,16 @@ app_settings:
   sharding_enabled: true
   # HTTPS is controlled via environment variables (see .env.example):
   #   HTTPS_ENABLED=1, SSL_CERT_FILE=<path>, SSL_KEY_FILE=<path>
+  # Amendable list of grouping labels used to categorise templates and agents.
+  groups:
+    - Discovery
+    - Phase 1
+    - Phase 2
+    - Phase 3
+    - Phase 4
+    - Planning
+    - Development
+    - Deployment
+    - QA
+    - Testing
+    - Integration

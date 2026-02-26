@@ -60,10 +60,15 @@ On successful login you are redirected to the template list. Your username and r
 
 ### Step 1 — Choose a Template
 
-The home page lists all available templates, grouped by type (Agent or Document).
+The home page lists all available templates, grouped by type (Agent or Document). Each template card shows its assigned functional groups as tags.
 
 - **Agent** templates generate AI personas with personas, workflows, and constraints.
 - **Document** templates generate structured Markdown documents (e.g., Project Briefs, ADRs).
+
+Use the **Filter by Group** bar at the top of the page to narrow the list:
+
+- Click any group chip (e.g. *Planning*, *Development*) to show only templates in that group.
+- Click **Select All** (the default) to remove the filter and show all templates.
 
 Click **▶ Start Guide** on any template card.
 
@@ -83,19 +88,30 @@ Click **✅ Generate BMAD v6 Document** when all sections are complete.
 The success page shows a list of generated files:
 
 ```
-agent.md          ← master controller / table of contents
+agent.md                        ← master controller / table of contents
 step-00_<section>.md
 step-01_<section>.md
 …
+<agent_name>_complete.md        ← consolidated single-file document
 ```
 
-Click **⬇ Download ZIP** to receive all files as a single archive.
+Two download options are available:
+
+| Button | Description |
+|---|---|
+| **⬇ Download ZIP** | All sharded files as a single ZIP archive |
+| **📄 Download Markdown** | The consolidated `<agent_name>_complete.md` file — ready to paste into any AI model |
 
 ### Step 4 — Submit to an AI Model
 
+**Option A — Sharded workflow:**
 1. Extract the ZIP.
 2. Open `agent.md` in a text editor or paste it directly into your AI model's system prompt.
 3. Paste additional step files as required context, following the checklist in `agent.md`.
+
+**Option B — Single document:**
+1. Download the Markdown file using **📄 Download Markdown**.
+2. Open the file and paste its entire contents into your AI model's input.
 
 ---
 
@@ -110,11 +126,12 @@ The **Dashboard** (`/dashboard`) lists all previously generated agents and docum
 
 ## 6. Editing Template Defaults
 
-If you regularly use a template but always change the same text, you can update the default content:
+If you regularly use a template but always change the same text, you can update the default content and assigned groups:
 
 1. On the home page, click **✏ Edit Defaults** on any template card.
-2. Update the pre-filled text for any section.
-3. Click **💾 Save Defaults**.
+2. **Groups**: Check or uncheck functional groups to control how the template is categorised and filtered.
+3. Update the pre-filled text for any section.
+4. Click **💾 Save Defaults**.
 
 Changes are saved back to `config/bmad_library.json`.
 
@@ -131,6 +148,18 @@ app_settings:
   base_location: "./bmad_output/"
   icon: "🧱"
   sharding_enabled: true
+  groups:
+    - Discovery
+    - Phase 1
+    - Phase 2
+    - Phase 3
+    - Phase 4
+    - Planning
+    - Development
+    - Deployment
+    - QA
+    - Testing
+    - Integration
 ```
 
 | Key | Description |
@@ -139,10 +168,49 @@ app_settings:
 | `web_port` | The TCP port the server listens on |
 | `base_location` | Where generated agent folders are stored |
 | `icon` | Emoji icon shown in the UI |
+| `groups` | Amendable list of functional group labels used to categorise templates |
+
+### Adding or Renaming Groups
+
+Edit the `groups` list in `config/config.yaml`. New group names become available immediately in the filter bar and in the Edit Defaults / Import pages. Existing templates retain their assigned groups even if a group name is later removed from the list; they will simply not match the removed group filter.
 
 ---
 
 ## 8. Adding Custom Templates
+
+### Via the Import Page (recommended)
+
+1. Navigate to **📥 Import Template / Agent** on the home page.
+2. Upload a `.md` file following the format below.
+3. Optionally select one or more **Groups** in the form — these override any groups declared in the file's frontmatter.
+4. Click **📥 Import Template**.
+
+> **Note:** If a template with the same name already exists it will be **overwritten** automatically.
+
+**Recommended Markdown format (with YAML frontmatter):**
+
+```markdown
+---
+name: My Custom Agent
+is_agent: true
+groups:
+  - Planning
+  - Development
+---
+
+# My Custom Agent
+
+## Persona
+Default persona text…
+
+## Workflow
+Default workflow text…
+
+## Constraints
+Default constraints text…
+```
+
+### Via `bmad_library.json` directly
 
 Edit `config/bmad_library.json` to add your own templates:
 
@@ -150,6 +218,7 @@ Edit `config/bmad_library.json` to add your own templates:
 {
   "name": "My Custom Agent",
   "is_agent": true,
+  "groups": ["Planning", "Development"],
   "sections": {
     "persona": "Default persona text…",
     "workflow": "Default workflow text…",
@@ -159,6 +228,7 @@ Edit `config/bmad_library.json` to add your own templates:
 ```
 
 - Set `"is_agent": false` for Document templates.
+- `"groups"` may be an empty list `[]` or omitted — such templates appear under **Select All** but not under any specific group filter.
 - Restart the application for changes to take effect (if not using Edit Defaults in the UI).
 
 ---
@@ -203,3 +273,13 @@ A: Set `HTTPS_ENABLED=1`, `SSL_CERT_FILE`, and `SSL_KEY_FILE` in your `.env` fil
 
 **Q: I've forgotten the admin password.**
 A: Generate a new hash with `werkzeug.security.generate_password_hash` and replace the `password_hash` value in `config/users.yaml`.
+
+**Q: I imported a template but want to update it.**
+A: Simply import a new `.md` file with the same template name — it will overwrite the existing entry.
+
+**Q: How do I filter templates by more than one group?**
+A: The filter currently shows templates belonging to the selected group. Click **Select All** to see all templates, then click a different group to switch the filter.
+
+**Q: How do I download a generated document for AI submission?**
+A: On the success page after generation, click **📄 Download Markdown** to save the consolidated `<agent_name>_complete.md` file. You can then paste its contents directly into any AI model.
+

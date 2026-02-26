@@ -4,14 +4,32 @@
 <h1>{{ config.icon }} Choose a Template</h1>
 <p class="subtitle">Select an Agent or Document template below to begin the guided interview.</p>
 
-<div class="card-grid">
+{% if groups %}
+<div class="filter-bar">
+  <strong class="filter-label">Filter by Group:</strong>
+  <div class="filter-chips">
+    <button class="filter-chip active" data-group="__all__">Select All</button>
+    {% for g in groups %}
+    <button class="filter-chip" data-group="{{ g }}">{{ g }}</button>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card-grid" id="template-grid">
   {% for t in templates %}
-  <div class="card {% if t.is_agent %}card-agent{% else %}card-doc{% endif %}">
+  <div class="card {% if t.is_agent %}card-agent{% else %}card-doc{% endif %}"
+       data-groups="{{ t.groups | join(',') }}">
     <div class="card-header">
       <span class="card-type-badge">{% if t.is_agent %}Agent{% else %}Document{% endif %}</span>
       <h3>{{ t.name }}</h3>
     </div>
     <div class="card-body">
+      {% if t.groups %}
+      <p class="card-groups">
+        {% for g in t.groups %}<span class="group-tag">{{ g }}</span>{% endfor %}
+      </p>
+      {% endif %}
       <p>{{ t.sections | length }} section(s)</p>
       <ul class="section-list">
         {% for key in t.sections %}
@@ -28,9 +46,12 @@
   <p>No templates found. Check <code>config/bmad_library.json</code>.</p>
   {% endfor %}
 </div>
+<p id="no-match-msg" style="display:none;">No templates match the selected group.</p>
 
 {% if current_user.is_authenticated %}
 <br>
 <a href="{{ url_for('import_template') }}" class="btn-secondary">📥 Import Template / Agent</a>
 {% endif %}
+
+<script src="{{ url_for('static', filename='js/filter.js') }}"></script>
 {% endblock %}
