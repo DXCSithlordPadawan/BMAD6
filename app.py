@@ -120,13 +120,16 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "download_zip", "download_md", "view_md_file",
         "amend_template", "delete_agent", "import_template",
         "admin_users", "suspend_user", "delete_user", "change_user_role",
+        "admin_set_password", "change_password",
     },
     "super_user": {
         "index", "guide", "dashboard", "success",
         "download_zip", "download_md", "delete_agent", "view_md_file",
+        "change_password",
     },
     "user": {
         "index", "guide", "dashboard", "success", "download_md", "view_md_file",
+        "change_password",
     },
 }
 
@@ -553,6 +556,47 @@ def register():
         return redirect(url_for("login"))
 
     return render_template("register.html", config=config, form={})
+
+
+@app.route("/change_password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    """Allow a logged-in user to change their own password."""
+    config = load_config()
+    if request.method == "POST":
+        if not _validate_csrf(request.form.get("_csrf")):
+            logger.warning("CSRF validation failed on /change_password for user '%s'", current_user.username)
+            abort(403)
+
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        errors: list[str] = []
+
+        users = load_users()
+        user = users.get(current_user.username)
+        if user is None or not check_password_hash(user.password_hash, current_password):
+            errors.append("Current password is incorrect.")
+        if not new_password:
+            errors.append("New password is required.")
+        elif len(new_password) < _MIN_PASSWORD_LEN:
+            errors.append(f"Password must be at least {_MIN_PASSWORD_LEN} characters.")
+        if new_password and confirm_password != new_password:
+            errors.append("Passwords do not match.")
+
+        if errors:
+            for err in errors:
+                flash(err, "danger")
+            return render_template("change_password.html", config=config)
+
+        users[current_user.username].password_hash = generate_password_hash(new_password)
+        save_users(users)
+        logger.info("User '%s' changed their password.", current_user.username)
+        flash("Password changed successfully.", "success")
+        return redirect(url_for("index"))
+
+    return render_template("change_password.html", config=config)
 
 
 @app.route("/")
@@ -1030,6 +1074,39 @@ def change_user_role(username: str):
         new_role,
     )
     flash(f"User '{escape(username)}' role changed to '{escape(new_role)}'.", "success")
+    return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/<username>/set_password", methods=["POST"])
+@login_required
+@role_required("admin")
+def admin_set_password(username: str):
+    """Admin sets any user's password without requiring the current password."""
+    if not _validate_csrf(request.form.get("_csrf")):
+        logger.warning("CSRF validation failed for admin_set_password '%s'", username)
+        abort(403)
+
+    users = load_users()
+    if username not in users:
+        abort(404)
+
+    new_password = request.form.get("new_password", "")
+    confirm_password = request.form.get("confirm_password", "")
+
+    if not new_password:
+        flash(f"New password for '{escape(username)}' cannot be empty.", "warning")
+        return redirect(url_for("admin_users"))
+    if len(new_password) < _MIN_PASSWORD_LEN:
+        flash(f"Password must be at least {_MIN_PASSWORD_LEN} characters.", "warning")
+        return redirect(url_for("admin_users"))
+    if new_password != confirm_password:
+        flash("Passwords do not match.", "warning")
+        return redirect(url_for("admin_users"))
+
+    users[username].password_hash = generate_password_hash(new_password)
+    save_users(users)
+    logger.info("Admin '%s' set password for user '%s'.", current_user.username, username)
+    flash(f"Password for '{escape(username)}' has been updated.", "success")
     return redirect(url_for("admin_users"))
 
 

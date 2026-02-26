@@ -235,7 +235,30 @@ Edit `config/bmad_library.json` to add your own templates:
 
 ## 9. User Management
 
-User accounts are defined in `config/users.yaml`. To add or change a user:
+### 9.1 Changing Your Own Password
+
+Any logged-in user can change their own password at `/change_password` (accessible via the **🔑 Change Password** link in the navigation bar).
+
+1. Enter your **current password**.
+2. Enter a **new password** (minimum 8 characters).
+3. **Confirm** the new password.
+4. Click **🔑 Change Password**.
+
+On success you will be redirected to the template list.
+
+### 9.2 Admin: Setting a User's Password
+
+Administrators can set any user's password without knowing the current password via the **👥 Users** page (`/admin/users`).
+
+1. Navigate to **👥 Users** in the navigation bar.
+2. Find the user in the table.
+3. Click **🔑 Set Password** to expand the password form.
+4. Enter and confirm the new password (minimum 8 characters).
+5. Click **✅ Set Password**.
+
+### 9.3 Managing Users via `config/users.yaml`
+
+User accounts are defined in `config/users.yaml`. To add or change a user manually:
 
 1. Generate a password hash:
    ```bash
@@ -246,7 +269,7 @@ User accounts are defined in `config/users.yaml`. To add or change a user:
    users:
      - username: myuser
        password_hash: "<paste hash here>"
-       role: user   # or: admin, security_lead, devops
+       role: user   # valid roles: user, super_user, admin
    ```
 3. Save the file — no restart required.
 
