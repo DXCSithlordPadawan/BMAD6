@@ -30,6 +30,6 @@ users:
     password_hash: "scrypt:32768:8:1$Jw0WZymR8khDXN6f$1fcc3c5c2560b82a7008c69ebf3c400f16bbdf01ef745dcdc19abd41450c065559fe4729d9a1920a964aa193397121338a454e333a9a47b5721d3394fd8a0cb1"
     role: admin
     full_name: "Administrator"
-    email: "admin@example.com"
-    contact_number: "+000000000"
+    email: "admin@eaip2.dxc.com"
+    contact_number: "+123456789"
     suspended: false
