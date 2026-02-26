@@ -32,6 +32,7 @@ New users may self-register at `/register`. All self-registered accounts default
 | View success page (`GET /success/<name>`) | ❌ | ✅ | ✅ | ✅ |
 | View dashboard (`GET /dashboard`) | ❌ | ✅ | ✅ | ✅ |
 | Download Consolidated Markdown (`GET /download_md/<name>`) | ❌ | ✅ | ✅ | ✅ |
+| **Change own password (`GET/POST /change_password`)** | ❌ | ✅ | ✅ | ✅ |
 | Download ZIP (`GET /download/<name>`) | ❌ | ❌ | ✅ | ✅ |
 | Delete generated document (`POST /delete/<name>`) | ❌ | ❌ | ✅ | ✅ |
 | Amend template defaults (`GET/POST /amend/<id>`) | ❌ | ❌ | ❌ | ✅ |
@@ -39,6 +40,8 @@ New users may self-register at `/register`. All self-registered accounts default
 | Manage users (`GET /admin/users`) | ❌ | ❌ | ❌ | ✅ |
 | Suspend/unsuspend user (`POST /admin/users/<u>/suspend`) | ❌ | ❌ | ❌ | ✅ |
 | Delete user (`POST /admin/users/<u>/delete`) | ❌ | ❌ | ❌ | ✅ |
+| Change user role (`POST /admin/users/<u>/role`) | ❌ | ❌ | ❌ | ✅ |
+| **Set any user's password (`POST /admin/users/<u>/set_password`)** | ❌ | ❌ | ❌ | ✅ |
 | Edit `config.yaml` (filesystem) | ❌ | ❌ | ❌ | ✅ |
 | Edit `config/users.yaml` (filesystem) | ❌ | ❌ | ❌ | ✅ |
 
@@ -69,6 +72,8 @@ Administrators may manage user accounts at `/admin/users`:
 
 - **Suspend / Unsuspend** — Prevents (or re-enables) a user from logging in without deleting their account.
 - **Delete** — Permanently removes the user from `config/users.yaml`.
+- **Change Role** — Promotes or demotes a user between `user`, `super_user`, and `admin` roles.
+- **Set Password** — Sets any user's password directly, without requiring the current password.
 
 An administrator cannot suspend or delete their own account.
 
@@ -112,6 +117,12 @@ Paste the output into `password_hash` for the relevant user entry.
 
 ### Changing a password
 
+**Via the UI (recommended):**
+
+Any authenticated user can change their own password at `/change_password` (navigation bar **🔑 Change Password** link). Administrators can set any user's password from the `/admin/users` page.
+
+**Via `config/users.yaml`:**
+
 1. Generate a new hash.
 2. Replace the existing `password_hash` value in `config/users.yaml`.
 3. No restart required (users are loaded per-request).
@@ -138,6 +149,14 @@ Browser → GET /register
 Browser → POST /register (full_name, email, username, contact_number, password, confirm_password, _csrf)
          ← 302 /login            (on success)
          ← 200 /register         (on validation failure)
+
+Browser → GET /change_password   (authenticated users only)
+Browser → POST /change_password (current_password, new_password, confirm_password, _csrf)
+         ← 302 /                 (on success)
+         ← 200 /change_password  (on validation failure)
+
+Browser → POST /admin/users/<u>/set_password (new_password, confirm_password, _csrf)  [admin only]
+         ← 302 /admin/users      (on success or validation failure with flash message)
 
 Browser → GET /logout
          ← 302 /login

@@ -64,6 +64,15 @@
           <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
           <button type="submit" class="btn-danger btn-sm">🗑 Delete</button>
         </form>
+        <details style="display:inline-block; margin-top:4px;">
+          <summary class="btn-secondary btn-sm" style="cursor:pointer;">🔑 Set Password</summary>
+          <form method="post" action="{{ url_for('admin_set_password', username=username) }}" style="margin-top:6px;">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <input type="password" name="new_password" placeholder="New password" class="form-control" required minlength="8" autocomplete="new-password">
+            <input type="password" name="confirm_password" placeholder="Confirm password" class="form-control" required minlength="8" autocomplete="new-password" style="margin-top:4px;">
+            <button type="submit" class="btn-primary btn-sm" style="margin-top:4px;">✅ Set Password</button>
+          </form>
+        </details>
         {% else %}
         <em class="muted">(current user)</em>
         {% endif %}
