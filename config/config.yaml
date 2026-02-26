@@ -1,6 +1,6 @@
 # config.yaml
 app_settings:
-  application_title: "BMAD Forge V6"
+  application_title: "DXC Agile Innovation Program BMAD Forge V6 (Build More Architect Dreams)"
   web_port: 8000
   base_location: "./bmad_output/"
   icon: "👩‍💻"
