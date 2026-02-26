@@ -117,16 +117,16 @@ def get_output_dir() -> Path:
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "admin": {
         "index", "guide", "dashboard", "success",
-        "download_zip", "download_md",
+        "download_zip", "download_md", "view_md_file",
         "amend_template", "delete_agent", "import_template",
-        "admin_users", "suspend_user", "delete_user",
+        "admin_users", "suspend_user", "delete_user", "change_user_role",
     },
     "super_user": {
         "index", "guide", "dashboard", "success",
-        "download_zip", "download_md", "delete_agent",
+        "download_zip", "download_md", "delete_agent", "view_md_file",
     },
     "user": {
-        "index", "guide", "dashboard", "success", "download_md",
+        "index", "guide", "dashboard", "success", "download_md", "view_md_file",
     },
 }
 
@@ -898,6 +898,10 @@ def import_template():
         elif not new_entry.get("groups"):
             new_entry["groups"] = []
 
+        # Form is_agent radio button overrides front matter value when present.
+        if "is_agent" in request.form:
+            new_entry["is_agent"] = request.form.get("is_agent") == "true"
+
         # Persist to the library, stripping injected ids first.
         templates = load_library()
         raw_templates = [{k: v for k, v in t.items() if k != "id"} for t in templates]
@@ -992,6 +996,78 @@ def delete_user(username: str):
     logger.info("Admin '%s' deleted user '%s'.", current_user.username, username)
     flash(f"User '{escape(username)}' has been deleted.", "success")
     return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/<username>/role", methods=["POST"])
+@login_required
+@role_required("admin")
+def change_user_role(username: str):
+    """Change the role of a user account."""
+    if not _validate_csrf(request.form.get("_csrf")):
+        logger.warning("CSRF validation failed for change_user_role '%s'", username)
+        abort(403)
+
+    if username == current_user.username:
+        flash("You cannot change your own role.", "warning")
+        return redirect(url_for("admin_users"))
+
+    users = load_users()
+    if username not in users:
+        abort(404)
+
+    new_role = request.form.get("role", "")
+    valid_roles = list(ROLE_PERMISSIONS.keys())
+    if new_role not in valid_roles:
+        flash(f"Invalid role. Choose from: {', '.join(valid_roles)}.", "warning")
+        return redirect(url_for("admin_users"))
+
+    users[username].role = new_role
+    save_users(users)
+    logger.info(
+        "Admin '%s' changed role of user '%s' to '%s'.",
+        current_user.username,
+        username,
+        new_role,
+    )
+    flash(f"User '{escape(username)}' role changed to '{escape(new_role)}'.", "success")
+    return redirect(url_for("admin_users"))
+
+
+@app.route("/view_file/<agent_name>/<filename>")
+@login_required
+@role_required("admin", "super_user", "user")
+def view_md_file(agent_name: str, filename: str):
+    """Serve an individual Markdown file for viewing in the browser."""
+    safe_name = sanitise_name(agent_name)
+    # Accept only the bare filename component (no path separators).
+    safe_filename = Path(filename).name
+    if not safe_filename.lower().endswith(".md"):
+        abort(403)
+
+    output_root = get_output_dir()
+    agent_dir = (output_root / safe_name).resolve()
+
+    # Path-traversal guard: agent_dir must be inside output_root.
+    try:
+        agent_dir.relative_to(output_root.resolve())
+    except ValueError:
+        abort(403)
+
+    file_path = (agent_dir / safe_filename).resolve()
+
+    # Path-traversal guard: file_path must be inside agent_dir.
+    try:
+        file_path.relative_to(agent_dir)
+    except ValueError:
+        abort(403)
+
+    if not file_path.exists() or not file_path.is_file():
+        abort(404)
+
+    logger.info(
+        "Serving Markdown file '%s' for agent '%s'.", safe_filename, safe_name
+    )
+    return send_file(file_path, mimetype="text/plain; charset=utf-8")
 
 
 # ── Error Handlers ─────────────────────────────────────────────────────────────

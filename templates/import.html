@@ -54,6 +54,18 @@ Any hard limits or rules for the agent.
     >
   </div>
 
+  <div class="section-guide">
+    <h3>Template Type</h3>
+    <p class="subtitle">Specify whether this import is an agent or a document template. Overrides any <code>is_agent</code> value in the file's front matter.</p>
+    <label class="checkbox-label">
+      <input type="radio" name="is_agent" value="true" checked> 🤖 Agent
+    </label>
+    &nbsp;&nbsp;
+    <label class="checkbox-label">
+      <input type="radio" name="is_agent" value="false"> 📄 Document Template
+    </label>
+  </div>
+
   {% if all_groups %}
   <div class="section-guide">
     <h3>Groups <em class="subtitle">(optional — overrides frontmatter)</em></h3>
