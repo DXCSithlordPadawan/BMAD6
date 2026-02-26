@@ -263,6 +263,7 @@
       "technical_requirements": "Specify the technical framework necessary to build and support your product. This section should provide a comprehensive guide to the technological infrastructure and integrations needed to ensure robust functionality and scalability.\r\n\r\n### Tech Stack\r\n- List core technologies and platforms.\r\n- Describe the rationale for choosing each component.\r\n- Highlight how they integrate to form the overall system.\r\n\r\n### System Architecture\r\n- Provide high-level diagrams of the system architecture.\r\n- Explain each component's role within the system.\r\n- Detail data flow and interaction between components.\r\n- Integration with existing Domain Controller, Certificate Server, Reverse Proxy and Load Balancer\r\n\r\n### Security Measures\r\n- Describe strategies for protecting data and ensuring privacy.\r\n- Outline compliance with relevant regulations and standards.\r\n- Include plans for regular security audits and updates.\r\n\r\n### Performance Metrics\r\n- Define key metrics for measuring system performance (e.g., response time, uptime).\r\n- Set performance benchmarks and monitoring practices.\r\n- Plan for load testing and performance optimization.\r\n\r\n### Integration Requirements\r\n- List necessary third-party services and APIs.\r\n- Detail integration points and methods.\r\n- Highlight any dependencies or prerequisites.\r\n\r\n---"
     },
     "groups": [
+      "Discovery",
       "Phase 1",
       "Planning"
     ]
