@@ -1,9 +1,19 @@
 # Product Requirements Document — BMAD v6 Template Architect
 
-**Document version:** 1.0  
+**Document version:** 2.0  
+**Date:** 2026-02-27  
 **Application name:** DXC Agile Innovation Program BMAD Forge V6 (Build More Architect Dreams)  
 **Short name:** BMAD v6 Template Architect  
-**Repository:** `DXCSithlordPadawan/BMAD6`
+**Repository:** `DXCSithlordPadawan/BMAD6`  
+**Language:** Python 3.12+  
+**Container platform:** Podman (primary)
+
+### Revision History
+
+| Version | Date | Summary |
+|---|---|---|
+| 1.0 | 2024 | Initial PRD |
+| 2.0 | 2026-02-27 | Updated to reflect current codebase: complete route inventory, Python 3.12+ emphasis, Podman-first container guidance |
 
 ---
 
@@ -78,7 +88,7 @@ Each shard can be submitted to an AI model independently, reducing token usage w
 | Environment Management | python-dotenv | ≥1.0.0 |
 | HTML Sanitisation | MarkupSafe | ≥2.1.5 |
 | Password Hashing | Werkzeug | ≥3.0.0 |
-| Containerisation | Podman / Docker | compatible |
+| Containerisation | Podman (primary), Docker (compatible) | 4.x+ |
 | Container Base Image | python:3.12-slim | official |
 
 ### 2.1 requirements.txt
