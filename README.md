@@ -32,7 +32,7 @@ python3.13 -c "from werkzeug.security import generate_password_hash; print(gener
 python3.13 app.py
 ```
 
-Open **http://localhost:8003** and sign in with your credentials.
+Open **http://localhost:8003** and sign in with your credentials.  Port depends on the config.yml
 
 > **Default credentials:** `admin` / `changeme` — change immediately before deploying.
 
